@@ -1,0 +1,229 @@
+import React, { useState } from "react"
+import { AlertCircle } from "lucide-react"
+
+export default function LoginForm() {
+  const [activeTab, setActiveTab] = useState("login")
+  const [loginData, setLoginData] = useState({ email: "", password: "" })
+  const [registerData, setRegisterData] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    role: "teacher",
+  })
+  const [error, setError] = useState("")
+
+  const handleLogin = (e) => {
+    e.preventDefault()
+    setError("")
+
+    const users = JSON.parse(localStorage.getItem("users") || "[]")
+    const user = users.find((u) => u.email === loginData.email && u.password === loginData.password)
+
+    if (user) {
+      localStorage.setItem("currentUser", JSON.stringify(user))
+      window.location.href = user.role === "teacher" ? "/teacher/dashboard" : "/student/dashboard"
+    } else {
+      setError("Invalid email or password")
+    }
+  }
+
+  const handleRegister = (e) => {
+    e.preventDefault()
+    setError("")
+
+    if (registerData.password !== registerData.confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+
+    const users = JSON.parse(localStorage.getItem("users") || "[]")
+
+    if (users.some((u) => u.email === registerData.email)) {
+      setError("Email already exists")
+      return
+    }
+
+    // Only allow teacher registration
+    if (registerData.role !== "teacher") {
+      setError("Student registration is only available through teacher portal")
+      return
+    }
+
+    const newUser = {
+      id: Date.now().toString(),
+      email: registerData.email,
+      password: registerData.password,
+      role: registerData.role,
+      photo: null,
+    }
+
+    users.push(newUser)
+    localStorage.setItem("users", JSON.stringify(users))
+    setActiveTab("login")
+    setLoginData({ email: registerData.email, password: "" })
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-red-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-red-100">
+          <div className="flex border-b">
+            <button
+              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                activeTab === "login" 
+                  ? "border-red-600 text-red-700" 
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+              }`}
+              onClick={() => setActiveTab("login")}
+            >
+              Login
+            </button>
+            <button
+              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                activeTab === "register" 
+                  ? "border-red-600 text-red-700" 
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+              }`}
+              onClick={() => setActiveTab("register")}
+            >
+              Register (Teachers Only)
+            </button>
+          </div>
+
+          <div className="p-8">
+            {activeTab === "login" ? (
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Login</h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Enter your credentials to access your account
+                  </p>
+                </div>
+                
+                {error && (
+                  <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
+                    <AlertCircle className="h-5 w-5" />
+                    <div>{error}</div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    placeholder="Enter your email"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    required
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                    value={loginData.password}
+                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    placeholder="Enter your password"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Login
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Teacher Registration</h2>
+                  <p className="mt-2 text-sm text-gray-600">Create a new teacher account</p>
+                </div>
+
+                {error && (
+                  <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
+                    <AlertCircle className="h-5 w-5" />
+                    <div>{error}</div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    id="reg-email"
+                    type="email"
+                    required
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                    value={registerData.email}
+                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                    placeholder="Enter your email"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <input
+                    id="reg-password"
+                    type="password"
+                    required
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                    value={registerData.password}
+                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                    placeholder="Create a password"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="reg-confirm-password" className="block text-sm font-medium text-gray-700">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="reg-confirm-password"
+                    type="password"
+                    required
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                    value={registerData.confirmPassword}
+                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                    placeholder="Confirm your password"
+                  />
+                </div>
+
+                <input
+                  type="hidden"
+                  value="teacher"
+                  onChange={(e) => setRegisterData({ ...registerData, role: e.target.value })}
+                />
+
+                <div className="text-xs text-gray-500 mt-4">
+                  <p>Note: Student registration is only available through the teacher portal after login.</p>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Register Teacher Account
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
