@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   FiHome,
@@ -11,29 +12,39 @@ import {
   FiMenu,
   FiX,
 } from "react-icons/fi";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function TeacherLayout({ children, title }) {
   const [user, setUser] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const currentUser = localStorage.getItem("currentUser");
-    if (!currentUser) {
-      window.location.href = "/";
-      return;
-    }
+    const checkAuth = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        window.location.href = "/";
+        return;
+      }
 
-    const userData = JSON.parse(currentUser);
-    if (userData.role !== "teacher") {
-      window.location.href = "/";
-      return;
-    }
+      if (user.user_metadata?.role !== "teacher") {
+        window.location.href = "/";
+        return;
+      }
 
-    setUser(userData);
+      setUser({
+        id: user.id,
+        email: user.email,
+        role: user.user_metadata?.role,
+        username: user.user_metadata?.username || user.email.split('@')[0]
+      });
+    };
+
+    checkAuth();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("currentUser");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     window.location.href = "/";
   };
 
@@ -41,7 +52,7 @@ export default function TeacherLayout({ children, title }) {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  if (!user) return null;
+  if (!user) return <div className="flex items-center justify-center h-screen">Loading...</div>;
 
   return (
     <div className="flex h-screen bg-red-50">
@@ -94,13 +105,6 @@ export default function TeacherLayout({ children, title }) {
             <FiFileText className="mr-3" />
             <span>Reports</span>
           </a>
-          {/* <a
-            href="/teacher/profile"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <FiUser className="mr-3" />
-            <span>Profile</span>
-          </a> */}
         </nav>
         <div className="p-4 border-t border-red-700">
           <button
@@ -183,10 +187,6 @@ export default function TeacherLayout({ children, title }) {
                 <FiFileText className="mr-3" />
                 <span>Reports</span>
               </a>
-              {/* <a href="/teacher/profile" className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors">
-                <FiUser className="mr-3" />
-                <span>Profile</span>
-              </a> */}
             </nav>
           </div>
         )}

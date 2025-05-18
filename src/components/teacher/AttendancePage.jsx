@@ -1,9 +1,10 @@
-"use client"
 
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
 import { CalendarIcon, Save, Check, X, Clock, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
+import { supabase } from "../../lib/supabaseClient"
+
 
 export default function AttendancePage() {
   const [subjects, setSubjects] = useState([])
@@ -14,6 +15,7 @@ export default function AttendancePage() {
   const [currentAttendance, setCurrentAttendance] = useState({})
   const [isSaving, setIsSaving] = useState(false)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   // Status indicators configuration
   const statusConfig = {
@@ -40,39 +42,53 @@ export default function AttendancePage() {
   }
 
   useEffect(() => {
-    const storedSubjects = JSON.parse(localStorage.getItem("subjects") || "[]")
-    const storedStudents = JSON.parse(localStorage.getItem("students") || "[]")
-    const storedAttendance = JSON.parse(localStorage.getItem("attendance") || "[]")
+    const fetchData = async () => {
+      setLoading(true)
+      const { data: subjectsData } = await supabase.from('subjects').select('*')
+      const { data: studentsData } = await supabase.from('students').select('*')
+      const { data: attendanceData } = await supabase.from('attendance').select('*')
 
-    setSubjects(storedSubjects)
-    setStudents(storedStudents)
-    setAttendanceRecords(storedAttendance)
+      if (subjectsData) setSubjects(subjectsData)
+      if (studentsData) setStudents(studentsData)
+      if (attendanceData) setAttendanceRecords(attendanceData)
+      setLoading(false)
+    }
+    fetchData()
   }, [])
 
   useEffect(() => {
     if (selectedSubject && selectedDate) {
       const dateString = format(selectedDate, "yyyy-MM-dd")
-      const existingRecords = attendanceRecords.filter(
-        (record) => record.subjectId === selectedSubject && record.date === dateString
-      )
+      
+      const fetchAttendance = async () => {
+        const { data } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('subject_id', selectedSubject)
+          .eq('date', dateString)
 
-      // Filter students who are enrolled in this subject
-      const studentsInSubject = students.filter(student => 
-        student.subjects?.includes(selectedSubject))
+        const existingRecords = data || []
 
-      const attendanceMap = {}
-      existingRecords.forEach((record) => {
-        attendanceMap[record.studentId] = record.status
-      })
+        // Filter students who are enrolled in this subject
+        const studentsInSubject = students.filter(student => 
+          student.subjects?.includes(selectedSubject))
 
-      // Initialize attendance for students in subject if not already set
-      studentsInSubject.forEach(student => {
-        if (attendanceMap[student.id] === undefined) {
-          attendanceMap[student.id] = "absent"
-        }
-      })
+        const attendanceMap = {}
+        existingRecords.forEach((record) => {
+          attendanceMap[record.student_id] = record.status
+        })
 
-      setCurrentAttendance(attendanceMap)
+        // Initialize attendance for students in subject if not already set
+        studentsInSubject.forEach(student => {
+          if (attendanceMap[student.id] === undefined) {
+            attendanceMap[student.id] = "absent"
+          }
+        })
+
+        setCurrentAttendance(attendanceMap)
+      }
+
+      fetchAttendance()
     }
   }, [selectedSubject, selectedDate, attendanceRecords, students])
 
@@ -83,34 +99,35 @@ export default function AttendancePage() {
     }))
   }
 
-  const saveAttendance = () => {
+  const saveAttendance = async () => {
     if (!selectedSubject || !selectedDate) return
 
     setIsSaving(true)
     const dateString = format(selectedDate, "yyyy-MM-dd")
 
-    // Remove existing records for this subject and date
-    const filteredRecords = attendanceRecords.filter(
-      (record) => !(record.subjectId === selectedSubject && record.date === dateString)
-    )
-
-    // Filter students who are enrolled in this subject
-    const studentsInSubject = students.filter(student => 
-      student.subjects?.includes(selectedSubject))
-
-    // Create new records only for students in this subject
-    const newRecords = studentsInSubject.map((student) => ({
-      id: `${dateString}-${selectedSubject}-${student.id}`,
+    // Prepare records to upsert
+    const recordsToUpsert = Object.entries(currentAttendance).map(([studentId, status]) => ({
       date: dateString,
-      subjectId: selectedSubject,
-      studentId: student.id,
-      status: currentAttendance[student.id] || "absent",
+      subject_id: selectedSubject,
+      student_id: studentId,
+      status: status
     }))
 
-    // Combine and save
-    const updatedRecords = [...filteredRecords, ...newRecords]
-    localStorage.setItem("attendance", JSON.stringify(updatedRecords))
-    setAttendanceRecords(updatedRecords)
+    const { error } = await supabase
+      .from('attendance')
+      .upsert(recordsToUpsert, { onConflict: ['date', 'subject_id', 'student_id'] })
+
+    if (!error) {
+      // Refetch attendance records
+      const { data } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('subject_id', selectedSubject)
+        .eq('date', dateString)
+
+      setAttendanceRecords(data || [])
+    }
+
     setIsSaving(false)
   }
 
@@ -204,7 +221,9 @@ export default function AttendancePage() {
             </p>
           </div>
           <div className="p-4">
-            {studentsInSubject.length === 0 ? (
+            {loading ? (
+              <p className="text-center py-4 text-gray-500">Loading attendance data...</p>
+            ) : studentsInSubject.length === 0 ? (
               <p className="text-center py-4 text-gray-500">
                 No students enrolled in this subject. Add students to the subject first.
               </p>
@@ -230,18 +249,18 @@ export default function AttendancePage() {
                                 {student.photo ? (
                                   <img
                                     src={student.photo}
-                                    alt={student.fullName}
+                                    alt={student.full_name}
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
                                   <span className="text-red-600 font-medium">
-                                    {student.fullName?.split(' ').map(n => n[0]).join('')}
+                                    {student.full_name?.split(' ').map(n => n[0]).join('')}
                                   </span>
                                 )}
                               </div>
-                              <span>{student.fullName}</span>
+                              <span>{student.full_name}</span>
                             </td>
-                            <td className="p-2">{student.studentId}</td>
+                            <td className="p-2">{student.student_id}</td>
                             <td className="p-2">
                               <select
                                 className="w-full px-3 py-2 border border-red-200 rounded-md bg-white"

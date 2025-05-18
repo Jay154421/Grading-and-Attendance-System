@@ -1,8 +1,8 @@
-"use client"
 
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
 import { Plus, Pencil, Trash } from "lucide-react"
+import { supabase } from "../../lib/supabaseClient"
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState([])
@@ -14,51 +14,83 @@ export default function SubjectsPage() {
     code: "",
     name: "",
     semester: "1st",
-    schoolYear: "",
+    school_year: "",
   })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const storedSubjects = localStorage.getItem("subjects")
-    if (storedSubjects) {
-      setSubjects(JSON.parse(storedSubjects))
+    const fetchSubjects = async () => {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!error) {
+        setSubjects(data)
+      }
+      setLoading(false)
     }
+    fetchSubjects()
   }, [])
 
-  const saveSubjects = (updatedSubjects) => {
-    localStorage.setItem("subjects", JSON.stringify(updatedSubjects))
-    setSubjects(updatedSubjects)
-  }
-
-  const handleAddSubject = () => {
-    const newSubject = {
-      id: Date.now().toString(),
-      ...formData,
+  const handleAddSubject = async () => {
+    if (!formData.code || !formData.name) {
+      alert("Please fill in all required fields")
+      return
     }
 
-    const updatedSubjects = [...subjects, newSubject]
-    saveSubjects(updatedSubjects)
+    const { data, error } = await supabase
+      .from('subjects')
+      .insert([formData])
+      .select()
+
+    if (error) {
+      alert("Error adding subject: " + error.message)
+      return
+    }
+
+    setSubjects([data[0], ...subjects])
     setIsAddDialogOpen(false)
     resetForm()
   }
 
-  const handleEditSubject = () => {
+  const handleEditSubject = async () => {
     if (!currentSubject) return
+
+    const { error } = await supabase
+      .from('subjects')
+      .update(formData)
+      .eq('id', currentSubject.id)
+
+    if (error) {
+      alert("Error updating subject: " + error.message)
+      return
+    }
 
     const updatedSubjects = subjects.map((subject) =>
       subject.id === currentSubject.id ? { ...subject, ...formData } : subject
     )
-
-    saveSubjects(updatedSubjects)
+    setSubjects(updatedSubjects)
     setIsEditDialogOpen(false)
     resetForm()
   }
 
-  const handleDeleteSubject = () => {
+  const handleDeleteSubject = async () => {
     if (!currentSubject) return
 
-    const updatedSubjects = subjects.filter((subject) => subject.id !== currentSubject.id)
+    const { error } = await supabase
+      .from('subjects')
+      .delete()
+      .eq('id', currentSubject.id)
 
-    saveSubjects(updatedSubjects)
+    if (error) {
+      alert("Error deleting subject: " + error.message)
+      return
+    }
+
+    const updatedSubjects = subjects.filter((subject) => subject.id !== currentSubject.id)
+    setSubjects(updatedSubjects)
     setIsDeleteDialogOpen(false)
   }
 
@@ -68,7 +100,7 @@ export default function SubjectsPage() {
       code: subject.code,
       name: subject.name,
       semester: subject.semester,
-      schoolYear: subject.schoolYear,
+      school_year: subject.school_year,
     })
     setIsEditDialogOpen(true)
   }
@@ -83,7 +115,7 @@ export default function SubjectsPage() {
       code: "",
       name: "",
       semester: "1st",
-      schoolYear: "",
+      school_year: "",
     })
     setCurrentSubject(null)
   }
@@ -106,7 +138,11 @@ export default function SubjectsPage() {
           <h3 className="text-lg font-semibold text-gray-800">Subject List</h3>
         </div>
         <div className="p-5">
-          {subjects.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Loading subjects...</p>
+            </div>
+          ) : subjects.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">No subjects found. Add a subject to get started.</p>
             </div>
@@ -128,7 +164,7 @@ export default function SubjectsPage() {
                       <td className="p-3 text-sm font-medium text-gray-800">{subject.code}</td>
                       <td className="p-3 text-sm text-gray-700">{subject.name}</td>
                       <td className="p-3 text-sm text-gray-700">{subject.semester}</td>
-                      <td className="p-3 text-sm text-gray-700">{subject.schoolYear}</td>
+                      <td className="p-3 text-sm text-gray-700">{subject.school_year}</td>
                       <td className="p-3 text-right">
                         <div className="flex justify-end">
                           <button
@@ -209,14 +245,14 @@ export default function SubjectsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="schoolYear" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="school_year" className="block text-sm font-medium text-gray-700 mb-1">
                     School Year
                   </label>
                   <input
-                    id="schoolYear"
+                    id="school_year"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
-                    value={formData.schoolYear}
-                    onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
+                    value={formData.school_year}
+                    onChange={(e) => setFormData({ ...formData, school_year: e.target.value })}
                     placeholder="e.g., 2023-2024"
                   />
                 </div>
@@ -232,6 +268,7 @@ export default function SubjectsPage() {
               <button
                 className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 onClick={handleAddSubject}
+                disabled={!formData.code || !formData.name}
               >
                 Add Subject
               </button>
@@ -293,14 +330,14 @@ export default function SubjectsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="edit-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="edit-school_year" className="block text-sm font-medium text-gray-700 mb-1">
                     School Year
                   </label>
                   <input
-                    id="edit-schoolYear"
+                    id="edit-school_year"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
-                    value={formData.schoolYear}
-                    onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
+                    value={formData.school_year}
+                    onChange={(e) => setFormData({ ...formData, school_year: e.target.value })}
                   />
                 </div>
               </div>

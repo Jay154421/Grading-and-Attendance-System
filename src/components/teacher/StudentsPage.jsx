@@ -1,202 +1,214 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import TeacherLayout from "../layout/teacher-layout";
-import { Plus, Pencil, Trash, Upload } from "lucide-react";
+import { useState, useEffect } from "react"
+import TeacherLayout from "../layout/teacher-layout"
+import { Plus, Pencil, Trash, Upload } from "lucide-react"
+import { supabase } from "../../lib/supabaseClient"
 
 export default function StudentsPage() {
-  const [students, setStudents] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [currentStudent, setCurrentStudent] = useState(null);
+  const [students, setStudents] = useState([])
+  const [subjects, setSubjects] = useState([])
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [currentStudent, setCurrentStudent] = useState(null)
   const [formData, setFormData] = useState({
-    studentId: "",
-    fullName: "",
+    student_id: "",
+    full_name: "",
     email: "",
     password: "",
     subjects: [],
     photo: null,
-  });
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [credentials, setCredentials] = useState(null);
+  })
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [credentials, setCredentials] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const storedStudents = localStorage.getItem("students");
-    if (storedStudents) {
-      setStudents(JSON.parse(storedStudents));
+    const fetchData = async () => {
+      setLoading(true)
+      
+      const { data: subjectsData } = await supabase.from('subjects').select('*')
+      const { data: studentsData } = await supabase.from('students').select('*')
+
+      if (subjectsData) setSubjects(subjectsData)
+      if (studentsData) setStudents(studentsData)
+      setLoading(false)
     }
 
-    const storedSubjects = localStorage.getItem("subjects");
-    if (storedSubjects) {
-      setSubjects(JSON.parse(storedSubjects));
-    }
-  }, []);
+    fetchData()
+  }, [])
 
-  const saveStudents = (updatedStudents) => {
-    localStorage.setItem("students", JSON.stringify(updatedStudents));
-    setStudents(updatedStudents);
-  };
-
-  const registerStudentAccount = (studentData) => {
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    
-    if (users.some(u => u.email === studentData.email)) {
-      return { error: "Email already exists" };
-    }
-
-    const newUser = {
-      id: Date.now().toString(),
+  const registerStudentAccount = async (studentData) => {
+    const { error } = await supabase.auth.signUp({
       email: studentData.email,
       password: studentData.password || "password",
-      role: "student",
-      studentId: studentData.studentId,
-      fullName: studentData.fullName,
-      subjects: studentData.subjects,
-      photo: studentData.photo
-    };
+      options: {
+        data: {
+          role: "student",
+          student_id: studentData.student_id,
+          full_name: studentData.full_name
+        }
+      }
+    })
 
-    users.push(newUser);
-    localStorage.setItem("users", JSON.stringify(users));
-    
+    if (error) return { error: error.message }
+
     return { 
-      username: studentData.email,
-      password: newUser.password 
-    };
-  };
+      email: studentData.email,
+      password: studentData.password || "password"
+    }
+  }
 
-  const handleAddStudent = () => {
-    if (!formData.studentId || !formData.fullName || !formData.email) {
-      alert("Please fill in all required fields");
-      return;
+  const handleAddStudent = async () => {
+    if (!formData.student_id || !formData.full_name || !formData.email) {
+      alert("Please fill in all required fields")
+      return
     }
 
-    const accountResult = registerStudentAccount(formData);
+    // Register auth account
+    const accountResult = await registerStudentAccount(formData)
     if (accountResult.error) {
-      alert(accountResult.error);
-      return;
+      alert(accountResult.error)
+      return
     }
 
-    const newStudent = {
-      id: Date.now().toString(),
-      ...formData,
-      password: undefined 
-    };
+    // Create student record
+    const { data, error } = await supabase
+      .from('students')
+      .insert([{
+        student_id: formData.student_id,
+        full_name: formData.full_name,
+        email: formData.email,
+        subjects: formData.subjects,
+        photo: formData.photo
+      }])
+      .select()
 
-    const updatedStudents = [...students, newStudent];
-    saveStudents(updatedStudents);
-    
-    setCredentials({
-      email: formData.email,
-      password: accountResult.password
-    });
-    
+    if (error) {
+      alert("Error creating student record: " + error.message)
+      return
+    }
+
+    setStudents([data[0], ...students])
+    setCredentials(accountResult)
     setTimeout(() => {
-      setIsAddDialogOpen(false);
-      resetForm();
-    }, 5000);
-  };
+      setIsAddDialogOpen(false)
+      resetForm()
+    }, 5000)
+  }
 
-  const handleEditStudent = () => {
-    if (!currentStudent) return;
+  const handleEditStudent = async () => {
+    if (!currentStudent) return
+
+    const { error } = await supabase
+      .from('students')
+      .update({
+        full_name: formData.full_name,
+        email: formData.email,
+        subjects: formData.subjects,
+        photo: formData.photo
+      })
+      .eq('id', currentStudent.id)
+
+    if (error) {
+      alert("Error updating student: " + error.message)
+      return
+    }
+
+    // Update auth user if email changed
+    if (formData.email !== currentStudent.email) {
+      await supabase.auth.admin.updateUserById(currentStudent.id, {
+        email: formData.email,
+        user_metadata: {
+          full_name: formData.full_name
+        }
+      })
+    }
 
     const updatedStudents = students.map((student) =>
       student.id === currentStudent.id ? { ...student, ...formData } : student
-    );
+    )
+    setStudents(updatedStudents)
+    setIsEditDialogOpen(false)
+    resetForm()
+  }
 
-    saveStudents(updatedStudents);
-    
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const updatedUsers = users.map(user => {
-      if (user.role === "student" && user.studentId === currentStudent.studentId) {
-        return {
-          ...user,
-          fullName: formData.fullName,
-          email: formData.email,
-          subjects: formData.subjects,
-          photo: formData.photo
-        };
-      }
-      return user;
-    });
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
+  const handleDeleteStudent = async () => {
+    if (!currentStudent) return
 
-    setIsEditDialogOpen(false);
-    resetForm();
-  };
+    // Delete student record
+    const { error } = await supabase
+      .from('students')
+      .delete()
+      .eq('id', currentStudent.id)
 
-  const handleDeleteStudent = () => {
-    if (!currentStudent) return;
+    if (error) {
+      alert("Error deleting student: " + error.message)
+      return
+    }
 
-    const updatedStudents = students.filter(
-      (student) => student.id !== currentStudent.id
-    );
+    // Delete auth user
+    await supabase.auth.admin.deleteUser(currentStudent.id)
 
-    saveStudents(updatedStudents);
-    
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const updatedUsers = users.filter(
-      user => !(user.role === "student" && user.studentId === currentStudent.studentId)
-    );
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
-
-    setIsDeleteDialogOpen(false);
-  };
+    const updatedStudents = students.filter((student) => student.id !== currentStudent.id)
+    setStudents(updatedStudents)
+    setIsDeleteDialogOpen(false)
+  }
 
   const openEditDialog = (student) => {
-    setCurrentStudent(student);
+    setCurrentStudent(student)
     setFormData({
-      studentId: student.studentId,
-      fullName: student.fullName,
+      student_id: student.student_id,
+      full_name: student.full_name,
       email: student.email,
       subjects: student.subjects || [],
       photo: student.photo,
-    });
-    setPhotoPreview(student.photo);
-    setIsEditDialogOpen(true);
-  };
+    })
+    setPhotoPreview(student.photo)
+    setIsEditDialogOpen(true)
+  }
 
   const openDeleteDialog = (student) => {
-    setCurrentStudent(student);
-    setIsDeleteDialogOpen(true);
-  };
+    setCurrentStudent(student)
+    setIsDeleteDialogOpen(true)
+  }
 
   const resetForm = () => {
     setFormData({
-      studentId: "",
-      fullName: "",
+      student_id: "",
+      full_name: "",
       email: "",
       password: "",
       subjects: [],
       photo: null,
-    });
-    setPhotoPreview(null);
-    setCurrentStudent(null);
-    setCredentials(null);
-  };
+    })
+    setPhotoPreview(null)
+    setCurrentStudent(null)
+    setCredentials(null)
+  }
 
   const handlePhotoChange = (e) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader();
+      const reader = new FileReader()
       reader.onloadend = () => {
-        const base64String = reader.result;
-        setFormData({ ...formData, photo: base64String });
-        setPhotoPreview(base64String);
-      };
-      reader.readAsDataURL(file);
+        const base64String = reader.result
+        setFormData({ ...formData, photo: base64String })
+        setPhotoPreview(base64String)
+      }
+      reader.readAsDataURL(file)
     }
-  };
+  }
 
   const handleSubjectChange = (subjectId) => {
     setFormData(prev => {
       const newSubjects = prev.subjects.includes(subjectId)
         ? prev.subjects.filter(id => id !== subjectId)
-        : [...prev.subjects, subjectId];
-      return { ...prev, subjects: newSubjects };
-    });
-  };
+        : [...prev.subjects, subjectId]
+      return { ...prev, subjects: newSubjects }
+    })
+  }
 
   return (
     <TeacherLayout title="Students">
@@ -205,8 +217,8 @@ export default function StudentsPage() {
         <button
           className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 transition-colors shadow-md hover:shadow-lg"
           onClick={() => {
-            setIsAddDialogOpen(true);
-            setCredentials(null);
+            setIsAddDialogOpen(true)
+            setCredentials(null)
           }}
         >
           <Plus className="h-5 w-5" />
@@ -219,7 +231,11 @@ export default function StudentsPage() {
           <h3 className="text-lg font-semibold text-gray-800">Student List</h3>
         </div>
         <div className="p-5">
-          {students.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Loading students...</p>
+            </div>
+          ) : students.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">No students found. Add a student to get started.</p>
             </div>
@@ -247,18 +263,18 @@ export default function StudentsPage() {
                           {student.photo ? (
                             <img
                               src={student.photo}
-                              alt={student.fullName}
+                              alt={student.full_name}
                               className="h-full w-full object-cover"
                             />
                           ) : (
                             <span className="text-gray-400 font-medium">
-                              {student.fullName?.split(' ').map(n => n[0]).join('')}
+                              {student.full_name?.split(' ').map(n => n[0]).join('')}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="p-3 text-sm text-gray-700">{student.studentId}</td>
-                      <td className="p-3 text-sm font-medium text-gray-800">{student.fullName}</td>
+                      <td className="p-3 text-sm text-gray-700">{student.student_id}</td>
+                      <td className="p-3 text-sm font-medium text-gray-800">{student.full_name}</td>
                       <td className="p-3 text-sm text-gray-700">{student.email}</td>
                       <td className="p-3 text-sm text-gray-700">
                         {student.subjects?.length > 0 
@@ -304,28 +320,28 @@ export default function StudentsPage() {
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="student_id" className="block text-sm font-medium text-gray-700 mb-1">
                     Student ID <span className="text-red-500">*</span>
                   </label>
                   <input
-                    id="studentId"
+                    id="student_id"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
-                    value={formData.studentId}
-                    onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
+                    value={formData.student_id}
+                    onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
                     placeholder="e.g., 2023-12345"
                     required
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
                     Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
-                    id="fullName"
+                    id="full_name"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     placeholder="e.g., John Doe"
                     required
                   />
@@ -397,8 +413,8 @@ export default function StudentsPage() {
                           />
                         ) : (
                           <span className="text-gray-400 font-medium text-lg">
-                            {formData.fullName
-                              ? formData.fullName.split(' ').map(n => n[0]).join('')
+                            {formData.full_name
+                              ? formData.full_name.split(' ').map(n => n[0]).join('')
                               : "ST"}
                           </span>
                         )}
@@ -449,7 +465,7 @@ export default function StudentsPage() {
               <button
                 className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleAddStudent}
-                disabled={!formData.studentId || !formData.fullName || !formData.email || formData.subjects.length === 0}
+                disabled={!formData.student_id || !formData.full_name || !formData.email || formData.subjects.length === 0}
               >
                 Add Student
               </button>
@@ -471,26 +487,26 @@ export default function StudentsPage() {
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="edit-studentId" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="edit-student_id" className="block text-sm font-medium text-gray-700 mb-1">
                     Student ID
                   </label>
                   <input
-                    id="edit-studentId"
+                    id="edit-student_id"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                    value={formData.studentId}
+                    value={formData.student_id}
                     readOnly
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="edit-fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="edit-full_name" className="block text-sm font-medium text-gray-700 mb-1">
                     Full Name
                   </label>
                   <input
-                    id="edit-fullName"
+                    id="edit-full_name"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   />
                 </div>
 
@@ -543,8 +559,8 @@ export default function StudentsPage() {
                           />
                         ) : (
                           <span className="text-gray-400 font-medium text-lg">
-                            {formData.fullName
-                              ? formData.fullName.split(' ').map(n => n[0]).join('')
+                            {formData.full_name
+                              ? formData.full_name.split(' ').map(n => n[0]).join('')
                               : "ST"}
                           </span>
                         )}
@@ -616,5 +632,5 @@ export default function StudentsPage() {
         </div>
       )}
     </TeacherLayout>
-  );
+  )
 }

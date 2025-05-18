@@ -1,8 +1,10 @@
+// pages/teacher/reports.jsx
 "use client"
 
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
 import { FileDown } from "lucide-react"
+import { supabase } from "../../lib/supabaseClient"
 
 export default function ReportsPage() {
   const [subjects, setSubjects] = useState([])
@@ -11,22 +13,28 @@ export default function ReportsPage() {
   const [gradeRecords, setGradeRecords] = useState([])
   const [selectedSubject, setSelectedSubject] = useState("")
   const [activeTab, setActiveTab] = useState("attendance")
+  // Removed unused loading state
 
   useEffect(() => {
-    const storedSubjects = JSON.parse(localStorage.getItem("subjects") || "[]")
-    const storedStudents = JSON.parse(localStorage.getItem("students") || "[]")
-    const storedAttendance = JSON.parse(localStorage.getItem("attendance") || "[]")
-    const storedGrades = JSON.parse(localStorage.getItem("grades") || "[]")
+    const fetchData = async () => {
+      // Removed setLoading call
+      const { data: subjectsData } = await supabase.from('subjects').select('*')
+      const { data: studentsData } = await supabase.from('students').select('*')
+      const { data: attendanceData } = await supabase.from('attendance').select('*')
+      const { data: gradesData } = await supabase.from('grades').select('*')
 
-    setSubjects(storedSubjects)
-    setStudents(storedStudents)
-    setAttendanceRecords(storedAttendance)
-    setGradeRecords(storedGrades)
+      if (subjectsData) setSubjects(subjectsData)
+      if (studentsData) setStudents(studentsData)
+      if (attendanceData) setAttendanceRecords(attendanceData)
+      if (gradesData) setGradeRecords(gradesData)
+      // Removed setLoading call
+    }
+    fetchData()
   }, [])
 
   const calculateCumulativeGrades = (studentId) => {
     const studentGrades = gradeRecords
-      .filter((record) => record.subjectId === selectedSubject && record.studentId === studentId)
+      .filter((record) => record.subject_id === selectedSubject && record.student_id === studentId)
       .reduce(
         (acc, record) => {
           acc[record.term] = record.grade
@@ -57,12 +65,12 @@ export default function ReportsPage() {
     const subject = subjects.find((s) => s.id === selectedSubject)
     if (!subject) return
 
-    const relevantAttendance = attendanceRecords.filter((record) => record.subjectId === selectedSubject)
+    const relevantAttendance = attendanceRecords.filter((record) => record.subject_id === selectedSubject)
     const attendanceByDate = relevantAttendance.reduce((acc, record) => {
       if (!acc[record.date]) {
         acc[record.date] = {}
       }
-      acc[record.date][record.studentId] = record.status
+      acc[record.date][record.student_id] = record.status
       return acc
     }, {})
 
@@ -74,7 +82,7 @@ export default function ReportsPage() {
     csv += "\n"
 
     students.forEach((student) => {
-      csv += `${student.studentId},"${student.firstName} ${student.lastName}"`
+      csv += `${student.student_id},"${student.full_name}"`
       dates.forEach((date) => {
         const status = attendanceByDate[date][student.id] || "N/A"
         csv += `,${status}`
@@ -107,7 +115,7 @@ export default function ReportsPage() {
       const finalGrade = grades.cumulative.final
       const status = finalGrade <= 3.0 ? "Passed" : "Failed"
 
-      csv += `${student.studentId},"${student.firstName} ${student.lastName}",`
+      csv += `${student.student_id},"${student.full_name}",`
       csv += `${grades.raw.prelim},${grades.raw.midterm},${grades.raw.semifinal},${grades.raw.final},`
       csv += `${grades.cumulative.prelim.toFixed(2)},${grades.cumulative.midterm.toFixed(2)},${grades.cumulative.semifinal.toFixed(2)},${grades.cumulative.final.toFixed(2)},`
       csv += `${status}\n`

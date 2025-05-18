@@ -1,67 +1,73 @@
-import React, { useState } from "react"
-import { AlertCircle } from "lucide-react"
+import React, { useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function LoginForm() {
-  const [activeTab, setActiveTab] = useState("login")
-  const [loginData, setLoginData] = useState({ email: "", password: "" })
+  const [activeTab, setActiveTab] = useState("login");
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
     role: "teacher",
-  })
-  const [error, setError] = useState("")
+  });
+  const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
-    e.preventDefault()
-    setError("")
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
 
-    const users = JSON.parse(localStorage.getItem("users") || "[]")
-    const user = users.find((u) => u.email === loginData.email && u.password === loginData.password)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
+      });
 
-    if (user) {
-      localStorage.setItem("currentUser", JSON.stringify(user))
-      window.location.href = user.role === "teacher" ? "/teacher/dashboard" : "/student/dashboard"
-    } else {
-      setError("Invalid email or password")
+      if (error) throw error;
+
+      // Redirect based on role
+      const role = data.user.user_metadata?.role || "teacher";
+      window.location.href =
+        role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
+    } catch (err) {
+      setError(err.message || "Invalid email or password");
     }
-  }
+  };
 
-  const handleRegister = (e) => {
-    e.preventDefault()
-    setError("")
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError("");
 
     if (registerData.password !== registerData.confirmPassword) {
-      setError("Passwords do not match")
-      return
+      setError("Passwords do not match");
+      return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users") || "[]")
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: registerData.email,
+        password: registerData.password,
+        options: {
+          data: {
+            role: registerData.role,
+          },
+          emailRedirectTo: window.location.origin, // Add this for email confirmation
+        },
+      });
 
-    if (users.some((u) => u.email === registerData.email)) {
-      setError("Email already exists")
-      return
+      if (error) throw error;
+
+      // Show success message
+      setError(
+        "Registration successful! Please check your email to confirm your account."
+      );
+      setActiveTab("login");
+      setLoginData({ email: registerData.email, password: "" });
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.");
+      console.error("Registration error:", err);
     }
-
-    // Only allow teacher registration
-    if (registerData.role !== "teacher") {
-      setError("Student registration is only available through teacher portal")
-      return
-    }
-
-    const newUser = {
-      id: Date.now().toString(),
-      email: registerData.email,
-      password: registerData.password,
-      role: registerData.role,
-      photo: null,
-    }
-
-    users.push(newUser)
-    localStorage.setItem("users", JSON.stringify(users))
-    setActiveTab("login")
-    setLoginData({ email: registerData.email, password: "" })
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-red-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -70,8 +76,8 @@ export default function LoginForm() {
           <div className="flex border-b">
             <button
               className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "login" 
-                  ? "border-red-600 text-red-700" 
+                activeTab === "login"
+                  ? "border-red-600 text-red-700"
                   : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
               }`}
               onClick={() => setActiveTab("login")}
@@ -80,8 +86,8 @@ export default function LoginForm() {
             </button>
             <button
               className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "register" 
-                  ? "border-red-600 text-red-700" 
+                activeTab === "register"
+                  ? "border-red-600 text-red-700"
                   : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
               }`}
               onClick={() => setActiveTab("register")}
@@ -99,7 +105,7 @@ export default function LoginForm() {
                     Enter your credentials to access your account
                   </p>
                 </div>
-                
+
                 {error && (
                   <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
                     <AlertCircle className="h-5 w-5" />
@@ -108,7 +114,10 @@ export default function LoginForm() {
                 )}
 
                 <div className="space-y-2">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Email
                   </label>
                   <input
@@ -117,13 +126,18 @@ export default function LoginForm() {
                     required
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                     value={loginData.email}
-                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, email: e.target.value })
+                    }
                     placeholder="Enter your email"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Password
                   </label>
                   <input
@@ -132,7 +146,9 @@ export default function LoginForm() {
                     required
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                     value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, password: e.target.value })
+                    }
                     placeholder="Enter your password"
                   />
                 </div>
@@ -147,8 +163,12 @@ export default function LoginForm() {
             ) : (
               <form onSubmit={handleRegister} className="space-y-6">
                 <div className="text-center">
-                  <h2 className="text-2xl font-bold text-gray-900">Teacher Registration</h2>
-                  <p className="mt-2 text-sm text-gray-600">Create a new teacher account</p>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Teacher Registration
+                  </h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Create a new teacher account
+                  </p>
                 </div>
 
                 {error && (
@@ -159,7 +179,10 @@ export default function LoginForm() {
                 )}
 
                 <div className="space-y-2">
-                  <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="reg-email"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Email
                   </label>
                   <input
@@ -168,13 +191,21 @@ export default function LoginForm() {
                     required
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                     value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        email: e.target.value,
+                      })
+                    }
                     placeholder="Enter your email"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="reg-password"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Password
                   </label>
                   <input
@@ -183,13 +214,21 @@ export default function LoginForm() {
                     required
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                     value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        password: e.target.value,
+                      })
+                    }
                     placeholder="Create a password"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="reg-confirm-password" className="block text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="reg-confirm-password"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Confirm Password
                   </label>
                   <input
@@ -198,7 +237,12 @@ export default function LoginForm() {
                     required
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                     value={registerData.confirmPassword}
-                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
                     placeholder="Confirm your password"
                   />
                 </div>
@@ -206,11 +250,16 @@ export default function LoginForm() {
                 <input
                   type="hidden"
                   value="teacher"
-                  onChange={(e) => setRegisterData({ ...registerData, role: e.target.value })}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, role: e.target.value })
+                  }
                 />
 
                 <div className="text-xs text-gray-500 mt-4">
-                  <p>Note: Student registration is only available through the teacher portal after login.</p>
+                  <p>
+                    Note: Student registration is only available through the
+                    teacher portal after login.
+                  </p>
                 </div>
 
                 <button
@@ -225,5 +274,5 @@ export default function LoginForm() {
         </div>
       </div>
     </div>
-  )
+  );
 }

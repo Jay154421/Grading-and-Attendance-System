@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
 
 import Login from "./components/auth/login-form";
 import StudentAttendance from "./components/student/AttendanceRecord";
@@ -17,7 +16,6 @@ import TeacherDashboard from "./components/teacher/TeacherDashboard";
 function App() {
   return (
     <Router>
-      <AuthProvider>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
@@ -32,7 +30,6 @@ function App() {
           <Route path="/teacher/grades" element={<GradesManage />} />
           <Route path="/teacher/reports" element={<Report />} />
         </Routes>
-      </AuthProvider>
     </Router>
   );
 }

@@ -1,8 +1,10 @@
+// pages/teacher/grades.jsx
 "use client"
 
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
 import { Save } from "lucide-react"
+import { supabase } from "../../lib/supabaseClient"
 
 export default function GradesPage() {
   const [subjects, setSubjects] = useState([])
@@ -12,48 +14,63 @@ export default function GradesPage() {
   const [currentGrades, setCurrentGrades] = useState({})
   const [isSaving, setIsSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("raw")
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const storedSubjects = JSON.parse(localStorage.getItem("subjects") || "[]")
-    const storedStudents = JSON.parse(localStorage.getItem("students") || "[]")
-    const storedGrades = JSON.parse(localStorage.getItem("grades") || "[]")
+    const fetchData = async () => {
+      setLoading(true)
+      const { data: subjectsData } = await supabase.from('subjects').select('*')
+      const { data: studentsData } = await supabase.from('students').select('*')
+      const { data: gradesData } = await supabase.from('grades').select('*')
 
-    setSubjects(storedSubjects)
-    setStudents(storedStudents)
-    setGradeRecords(storedGrades)
+      if (subjectsData) setSubjects(subjectsData)
+      if (studentsData) setStudents(studentsData)
+      if (gradesData) setGradeRecords(gradesData)
+      setLoading(false)
+    }
+    fetchData()
   }, [])
 
   useEffect(() => {
     if (selectedSubject) {
-      const existingRecords = gradeRecords.filter((record) => record.subjectId === selectedSubject)
-      const gradesMap = {}
+      const fetchGrades = async () => {
+        const { data } = await supabase
+          .from('grades')
+          .select('*')
+          .eq('subject_id', selectedSubject)
 
-      // Filter students who are enrolled in this subject
-      const studentsInSubject = students.filter(student => 
-        student.subjects?.includes(selectedSubject))
+        const existingRecords = data || []
+        const gradesMap = {}
 
-      studentsInSubject.forEach((student) => {
-        gradesMap[student.id] = {
-          prelim: 0,
-          midterm: 0,
-          semifinal: 0,
-          final: 0,
-        }
-      })
+        // Filter students who are enrolled in this subject
+        const studentsInSubject = students.filter(student => 
+          student.subjects?.includes(selectedSubject))
 
-      existingRecords.forEach((record) => {
-        if (!gradesMap[record.studentId]) {
-          gradesMap[record.studentId] = {
+        studentsInSubject.forEach((student) => {
+          gradesMap[student.id] = {
             prelim: 0,
             midterm: 0,
             semifinal: 0,
             final: 0,
           }
-        }
-        gradesMap[record.studentId][record.term] = record.grade
-      })
+        })
 
-      setCurrentGrades(gradesMap)
+        existingRecords.forEach((record) => {
+          if (!gradesMap[record.student_id]) {
+            gradesMap[record.student_id] = {
+              prelim: 0,
+              midterm: 0,
+              semifinal: 0,
+              final: 0,
+            }
+          }
+          gradesMap[record.student_id][record.term] = record.grade
+        })
+
+        setCurrentGrades(gradesMap)
+      }
+
+      fetchGrades()
     }
   }, [selectedSubject, gradeRecords, students])
 
@@ -68,35 +85,35 @@ export default function GradesPage() {
     }))
   }
 
-  const saveGrades = () => {
+  const saveGrades = async () => {
     if (!selectedSubject) return
 
     setIsSaving(true)
-    const filteredRecords = gradeRecords.filter((record) => record.subjectId !== selectedSubject)
-    const newRecords = []
-
-    // Filter students who are enrolled in this subject
-    const studentsInSubject = students.filter(student => 
-      student.subjects?.includes(selectedSubject))
-
-    Object.entries(currentGrades).forEach(([studentId, terms]) => {
-      // Only save if student is in this subject
-      if (studentsInSubject.some(student => student.id === studentId)) {
-        Object.entries(terms).forEach(([term, grade]) => {
-          newRecords.push({
-            id: `${selectedSubject}-${studentId}-${term}`,
-            subjectId: selectedSubject,
-            studentId,
-            term,
-            grade,
-          })
-        })
-      }
+    
+    // Prepare records to upsert
+    const recordsToUpsert = Object.entries(currentGrades).flatMap(([studentId, terms]) => {
+      return Object.entries(terms).map(([term, grade]) => ({
+        subject_id: selectedSubject,
+        student_id: studentId,
+        term,
+        grade,
+      }))
     })
 
-    const updatedRecords = [...filteredRecords, ...newRecords]
-    localStorage.setItem("grades", JSON.stringify(updatedRecords))
-    setGradeRecords(updatedRecords)
+    const { error } = await supabase
+      .from('grades')
+      .upsert(recordsToUpsert, { onConflict: ['subject_id', 'student_id', 'term'] })
+
+    if (!error) {
+      // Refetch grades
+      const { data } = await supabase
+        .from('grades')
+        .select('*')
+        .eq('subject_id', selectedSubject)
+
+      setGradeRecords(data || [])
+    }
+
     setIsSaving(false)
   }
 
@@ -204,7 +221,9 @@ export default function GradesPage() {
                 </p>
               </div>
               <div className="p-4">
-                {studentsInSubject.length === 0 ? (
+                {loading ? (
+                  <p className="text-center py-4 text-gray-500">Loading grades data...</p>
+                ) : studentsInSubject.length === 0 ? (
                   <p className="text-center py-4 text-gray-500">
                     No students enrolled in this subject. Add students to the subject first.
                   </p>
@@ -229,16 +248,16 @@ export default function GradesPage() {
                                   {student.photo ? (
                                     <img
                                       src={student.photo}
-                                      alt={student.fullName}
+                                      alt={student.full_name}
                                       className="h-full w-full object-cover"
                                     />
                                   ) : (
                                     <span className="text-red-600 font-medium">
-                                      {student.fullName?.split(' ').map(n => n[0]).join('')}
+                                      {student.full_name?.split(' ').map(n => n[0]).join('')}
                                     </span>
                                   )}
                                 </div>
-                                <span>{student.fullName}</span>
+                                <span>{student.full_name}</span>
                               </td>
                               <td className="p-2">
                                 <input
@@ -317,7 +336,9 @@ export default function GradesPage() {
                 </p>
               </div>
               <div className="p-4">
-                {studentsInSubject.length === 0 ? (
+                {loading ? (
+                  <p className="text-center py-4 text-gray-500">Loading cumulative grades...</p>
+                ) : studentsInSubject.length === 0 ? (
                   <p className="text-center py-4 text-gray-500">
                     No students enrolled in this subject. Add students to the subject first.
                   </p>
@@ -352,16 +373,16 @@ export default function GradesPage() {
                                   {student.photo ? (
                                     <img
                                       src={student.photo}
-                                      alt={student.fullName}
+                                      alt={student.full_name}
                                       className="h-full w-full object-cover"
                                     />
                                   ) : (
                                     <span className="text-red-600 font-medium">
-                                      {student.fullName?.split(' ').map(n => n[0]).join('')}
+                                      {student.full_name?.split(' ').map(n => n[0]).join('')}
                                     </span>
                                   )}
                                 </div>
-                                <span>{student.fullName}</span>
+                                <span>{student.full_name}</span>
                               </td>
                               <td
                                 className={`p-2 ${
