@@ -12,60 +12,82 @@ export default function LoginForm() {
     role: "teacher",
   });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: loginData.email,
         password: loginData.password,
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // Get the full user data to check role
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("User data not available");
+      }
 
       // Redirect based on role
-      const role = data.user.user_metadata?.role || "teacher";
+      const role = user.user_metadata?.role || "teacher";
       window.location.href =
         role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
     } catch (err) {
       setError(err.message || "Invalid email or password");
+      console.error("Login error:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
     if (registerData.password !== registerData.confirmPassword) {
       setError("Passwords do not match");
+      setIsLoading(false);
       return;
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: registerData.email,
         password: registerData.password,
         options: {
           data: {
             role: registerData.role,
           },
-          emailRedirectTo: window.location.origin, // Add this for email confirmation
         },
       });
 
       if (error) throw error;
 
-      // Show success message
-      setError(
-        "Registration successful! Please check your email to confirm your account."
-      );
+      // Auto-confirm the user (only works if email confirmations are disabled in Supabase settings)
+      if (data.user) {
+        await supabase.auth.signInWithPassword({
+          email: registerData.email,
+          password: registerData.password,
+        });
+      }
+
+      setError("Registration successful! You can now login.");
       setActiveTab("login");
       setLoginData({ email: registerData.email, password: "" });
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
       console.error("Registration error:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -73,7 +95,7 @@ export default function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-red-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-md overflow-hidden border border-red-100">
-          <div className="flex border-b">
+          <div className="flex">
             <button
               className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                 activeTab === "login"
@@ -156,8 +178,9 @@ export default function LoginForm() {
                 <button
                   type="submit"
                   className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  disabled={isLoading}
                 >
-                  Login
+                  {isLoading ? "Logging in..." : "Login"}
                 </button>
               </form>
             ) : (
@@ -265,8 +288,9 @@ export default function LoginForm() {
                 <button
                   type="submit"
                   className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  disabled={isLoading}
                 >
-                  Register Teacher Account
+                  {isLoading ? "Registering..." : "Register Teacher Account"}
                 </button>
               </form>
             )}

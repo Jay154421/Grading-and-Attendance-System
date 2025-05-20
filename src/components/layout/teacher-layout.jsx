@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   FiHome,
@@ -7,28 +6,36 @@ import {
   FiCalendar,
   FiAward,
   FiFileText,
-  FiUser,
   FiLogOut,
   FiMenu,
   FiX,
 } from "react-icons/fi";
 import { supabase } from "../../lib/supabaseClient";
+import { useNavigate } from "react-router-dom";
 
 export default function TeacherLayout({ children, title }) {
   const [user, setUser] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error || !user) {
-        window.location.href = "/";
+    const checkSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error || !session) {
+        navigate("/");
+        return;
+      }
+
+      // Force refresh the session if needed
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/");
         return;
       }
 
       if (user.user_metadata?.role !== "teacher") {
-        window.location.href = "/";
+        navigate("/");
         return;
       }
 
@@ -36,23 +43,53 @@ export default function TeacherLayout({ children, title }) {
         id: user.id,
         email: user.email,
         role: user.user_metadata?.role,
-        username: user.user_metadata?.username || user.email.split('@')[0]
+        username: user.user_metadata?.username || user.email.split("@")[0],
       });
     };
 
-    checkAuth();
-  }, []);
+    checkSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT") {
+        navigate("/");
+      } else if (session?.user) {
+        if (session.user.user_metadata?.role === "teacher") {
+          setUser({
+            id: session.user.id,
+            email: session.user.email,
+            role: session.user.user_metadata?.role,
+            username: session.user.user_metadata?.username || session.user.email.split("@")[0],
+          });
+        } else {
+          navigate("/");
+        }
+      }
+    });
+
+    return () => {
+      if (authListener?.unsubscribe) {
+        authListener.unsubscribe();
+      }
+    };
+  }, [navigate]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/";
+    navigate("/");
   };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  if (!user) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!user) {
+    return null; // or a loading spinner
+  }
+
+  // Helper function to handle navigation
+  const handleNavigation = (path) => {
+    navigate(path);
+  };
 
   return (
     <div className="flex h-screen bg-red-50">
@@ -60,51 +97,53 @@ export default function TeacherLayout({ children, title }) {
       <aside className="hidden md:flex flex-col w-64 bg-red-800 text-white border-r">
         <div className="p-4 border-b border-red-700">
           <h2 className="text-xl font-bold">Teacher Portal</h2>
-          <p className="text-sm text-red-200">Welcome, {user.username}</p>
+          <p className="text-sm text-red-200">
+            Welcome, {user?.username || "Teacher"}
+          </p>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <a
-            href="/teacher/dashboard"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
+          <button
+            onClick={() => handleNavigation("/teacher/dashboard")}
+            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
           >
             <FiHome className="mr-3" />
             <span>Dashboard</span>
-          </a>
-          <a
-            href="/teacher/subjects"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
+          </button>
+          <button
+            onClick={() => handleNavigation("/teacher/subjects")}
+            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
           >
             <FiBook className="mr-3" />
             <span>Subjects</span>
-          </a>
-          <a
-            href="/teacher/students"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
+          </button>
+          <button
+            onClick={() => handleNavigation("/teacher/students")}
+            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
           >
             <FiUsers className="mr-3" />
             <span>Students</span>
-          </a>
-          <a
-            href="/teacher/attendance"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
+          </button>
+          <button
+            onClick={() => handleNavigation("/teacher/attendance")}
+            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
           >
             <FiCalendar className="mr-3" />
             <span>Attendance</span>
-          </a>
-          <a
-            href="/teacher/grades"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
+          </button>
+          <button
+            onClick={() => handleNavigation("/teacher/grades")}
+            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
           >
             <FiAward className="mr-3" />
             <span>Grades</span>
-          </a>
-          <a
-            href="/teacher/reports"
-            className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors"
+          </button>
+          <button
+            onClick={() => handleNavigation("/teacher/reports")}
+            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
           >
             <FiFileText className="mr-3" />
             <span>Reports</span>
-          </a>
+          </button>
         </nav>
         <div className="p-4 border-t border-red-700">
           <button
@@ -145,48 +184,48 @@ export default function TeacherLayout({ children, title }) {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white shadow-sm">
             <nav className="p-4 space-y-2">
-              <a
-                href="/teacher/dashboard"
-                className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors"
+              <button
+                onClick={() => handleNavigation("/teacher/dashboard")}
+                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
               >
                 <FiHome className="mr-3" />
                 <span>Dashboard</span>
-              </a>
-              <a
-                href="/teacher/subjects"
-                className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors"
+              </button>
+              <button
+                onClick={() => handleNavigation("/teacher/subjects")}
+                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
               >
                 <FiBook className="mr-3" />
                 <span>Subjects</span>
-              </a>
-              <a
-                href="/teacher/students"
-                className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors"
+              </button>
+              <button
+                onClick={() => handleNavigation("/teacher/students")}
+                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
               >
                 <FiUsers className="mr-3" />
                 <span>Students</span>
-              </a>
-              <a
-                href="/teacher/attendance"
-                className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors"
+              </button>
+              <button
+                onClick={() => handleNavigation("/teacher/attendance")}
+                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
               >
                 <FiCalendar className="mr-3" />
                 <span>Attendance</span>
-              </a>
-              <a
-                href="/teacher/grades"
-                className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors"
+              </button>
+              <button
+                onClick={() => handleNavigation("/teacher/grades")}
+                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
               >
                 <FiAward className="mr-3" />
                 <span>Grades</span>
-              </a>
-              <a
-                href="/teacher/reports"
-                className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors"
+              </button>
+              <button
+                onClick={() => handleNavigation("/teacher/reports")}
+                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
               >
                 <FiFileText className="mr-3" />
                 <span>Reports</span>
-              </a>
+              </button>
             </nav>
           </div>
         )}

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import StudentLayout from "../layout/student-layout";
 import { Upload, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabaseClient";
+
+const STORAGE_BUCKET = "student-profile-photos";
 
 export default function StudentProfilePage() {
   const navigate = useNavigate();
@@ -12,6 +15,7 @@ export default function StudentProfilePage() {
     email: '',
     photo: null
   });
+  const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
@@ -21,39 +25,47 @@ export default function StudentProfilePage() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const user = localStorage.getItem("currentUser");
-        if (!user) {
+        setLoading(true);
+        
+        // Get session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
           navigate("/");
           return;
         }
 
-        const userData = JSON.parse(user);
-        setCurrentUser(userData);
-
-        const students = JSON.parse(localStorage.getItem("students") || "[]");
-        const studentRecord = students.find((s) => s.id === userData.id);
-
-        if (!studentRecord) {
-          setToastMessage("Student record not found");
-          setToastVisible(true);
-          setTimeout(() => setToastVisible(false), 3000);
+        // Get user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          navigate("/");
           return;
         }
 
+        setCurrentUser(user);
+
+        // Get student data
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('student_id, full_name, photo')
+          .eq('email', user.email)
+          .single();
+
+        if (studentError) throw studentError;
+        if (!studentData) throw new Error("Student record not found");
+
         setStudent({
-          id: studentRecord.id || '',
-          fullName: studentRecord.fullName || '',
-          email: studentRecord.email || '',
-          photo: studentRecord.photo || null
+          id: studentData.student_id || '',
+          fullName: studentData.full_name || '',
+          email: user.email || '',
+          photo: studentData.photo || null
         });
 
-        if (studentRecord.photo) {
-          setPhotoPreview(studentRecord.photo);
+        if (studentData.photo) {
+          setPhotoPreview(studentData.photo);
         }
       } catch (error) {
         console.error("Error loading profile:", error);
-        setToastMessage("Error loading profile data");
-        setToastVisible(true);
+        showToast(error.message || "Error loading profile data", true);
       } finally {
         setLoading(false);
       }
@@ -64,72 +76,98 @@ export default function StudentProfilePage() {
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.match('image.*')) {
-        setToastMessage("Please upload an image file");
-        setToastVisible(true);
-        setTimeout(() => setToastVisible(false), 3000);
-        return;
-      }
-      
-      if (file.size > 2 * 1024 * 1024) {
-        setToastMessage("Image size should be less than 2MB");
-        setToastVisible(true);
-        setTimeout(() => setToastVisible(false), 3000);
-        return;
-      }
+    if (!file) return;
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+    if (!file.type.match('image.*')) {
+      showToast("Please upload an image file (JPEG, PNG)", true);
+      return;
     }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Image size should be less than 2MB", true);
+      return;
+    }
+
+    setPhotoFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const saveProfile = () => {
-    if (!currentUser || !student.id) return;
+  const showToast = (message) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  };
 
+  const saveProfile = async () => {
+    if (!currentUser || !student.id) return;
     setIsSaving(true);
 
     try {
-      const students = JSON.parse(localStorage.getItem("students") || "[]");
-      const updatedStudents = students.map((s) => {
-        if (s.id === currentUser.id) {
-          return {
-            ...s,
-            photo: photoPreview,
-          };
+      let photoUrl = student.photo;
+
+      // Upload new photo if selected
+      if (photoFile) {
+        // Auto-create bucket if it doesn't exist (RLS is disabled)
+        const { data: buckets } = await supabase.storage.listBuckets();
+        if (!buckets?.some(b => b.name === STORAGE_BUCKET)) {
+          await supabase.storage.createBucket(STORAGE_BUCKET, {
+            public: true,
+            allowedMimeTypes: ['image/*'],
+          });
         }
-        return s;
-      });
 
-      localStorage.setItem("students", JSON.stringify(updatedStudents));
-      
-      const updatedUser = {
-        ...currentUser,
-        photo: photoPreview
-      };
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-      setCurrentUser(updatedUser);
+        // Upload file
+        const fileExt = photoFile.name.split('.').pop();
+        const fileName = `${student.id}-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(fileName, photoFile);
 
-      setToastMessage("Profile updated successfully!");
-      setToastVisible(true);
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from(STORAGE_BUCKET)
+          .getPublicUrl(fileName);
+
+        photoUrl = publicUrl;
+      }
+
+      // Update student record
+      const { error: updateError } = await supabase
+        .from('students')
+        .update({ 
+          photo: photoUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('email', currentUser.email);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setStudent(prev => ({ ...prev, photo: photoUrl }));
+      setPhotoFile(null);
+      showToast("Profile updated successfully!");
     } catch (error) {
-      setToastMessage("Failed to save profile. Please try again.");
-      setToastVisible(true);
       console.error("Error saving profile:", error);
+      showToast(error.message || "Failed to save profile", true);
     } finally {
       setIsSaving(false);
-      setTimeout(() => setToastVisible(false), 3000);
     }
   };
 
   if (loading) {
     return (
       <StudentLayout title="Profile">
-        <div className="flex items-center justify-center h-full">
-          <p>Loading profile...</p>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
         </div>
       </StudentLayout>
     );
@@ -138,7 +176,7 @@ export default function StudentProfilePage() {
   if (!currentUser || !student.id) {
     return (
       <StudentLayout title="Profile">
-        <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-red-500 mb-4">Unable to load profile data</p>
             <button 
@@ -160,54 +198,41 @@ export default function StudentProfilePage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Profile Information Section */}
         <div className="bg-white rounded-lg border border-red-100 shadow-sm">
           <div className="p-4 border-b border-red-100 bg-red-50">
             <h3 className="text-lg font-bold text-red-800">Profile Information</h3>
           </div>
           <div className="p-4 space-y-4">
             <div className="space-y-2">
-              <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
-                Student ID
-              </label>
-              <input
-                id="studentId"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                value={student.id}
-                readOnly
-              />
+              <label className="block text-sm font-medium text-gray-700">Student ID</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                {student.id}
+              </div>
             </div>
             <div className="space-y-2">
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                Full Name
-              </label>
-              <input
-                id="fullName"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                value={student.fullName}
-                readOnly
-              />
+              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                {student.fullName}
+              </div>
             </div>
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                id="email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                value={student.email}
-                readOnly
-              />
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                {student.email}
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Profile Photo Section */}
         <div className="bg-white rounded-lg border border-red-100 shadow-sm">
           <div className="p-4 border-b border-red-100 bg-red-50">
             <h3 className="text-lg font-bold text-red-800">Profile Photo</h3>
           </div>
           <div className="p-4 space-y-4">
             <div className="flex flex-col items-center gap-4">
-              <div className="h-32 w-32 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+              <div className="h-32 w-32 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center border-2 border-gray-300">
                 {photoPreview ? (
                   <img 
                     src={photoPreview} 
@@ -221,7 +246,7 @@ export default function StudentProfilePage() {
                   </span>
                 )}
               </div>
-              <div className="w-full">
+              <div className="w-full space-y-2">
                 <input 
                   id="photo" 
                   type="file" 
@@ -234,15 +259,20 @@ export default function StudentProfilePage() {
                   className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md hover:bg-red-50 cursor-pointer transition-colors"
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Photo
+                  {photoFile ? "Change Photo" : "Upload Photo"}
                 </label>
+                {photoFile && (
+                  <p className="text-xs text-gray-500 text-center">
+                    {photoFile.name} ({Math.round(photoFile.size / 1024)}KB)
+                  </p>
+                )}
               </div>
               <button
                 className="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-red-400 transition-colors"
                 onClick={saveProfile}
-                disabled={isSaving || !photoPreview}
+                disabled={isSaving || !photoFile}
               >
-                {isSaving ? "Saving..." : "Save Profile"}
+                {isSaving ? "Saving..." : "Save Changes"}
                 <Save className="ml-2 h-4 w-4" />
               </button>
             </div>
@@ -250,8 +280,10 @@ export default function StudentProfilePage() {
         </div>
       </div>
 
+      {/* Toast Notification */}
       {toastVisible && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg animate-fade-in-out">
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-md shadow-lg animate-fade-in-out
+          ${toastMessage.includes("Failed") || toastMessage.includes("Error") ? "bg-red-500" : "bg-green-500"} text-white`}>
           {toastMessage}
         </div>
       )}

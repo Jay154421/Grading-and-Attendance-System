@@ -1,36 +1,115 @@
-import React, { useEffect, useState } from "react"
-import StudentLayout from "../layout/student-layout"
-import { BookOpen, ClipboardCheck, GraduationCap } from "lucide-react"
+import React, { useEffect, useState } from "react";
+import StudentLayout from "../layout/student-layout";
+import { BookOpen, ClipboardCheck, GraduationCap } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function StudentDashboard() {
   const [stats, setStats] = useState({
     subjects: 0,
     attendanceRecords: 0,
-    gradeRecords: 0,
-  })
-  const [user, setUser] = useState(null)
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const currentUser = localStorage.getItem("currentUser")
-    if (currentUser) {
-      const userData = JSON.parse(currentUser)
-      setUser(userData)
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const subjects = JSON.parse(localStorage.getItem("subjects") || "[]")
-      const attendance = JSON.parse(localStorage.getItem("attendance") || "[]").filter(
-        (a) => a.studentId === userData.id,
-      )
-      const grades = JSON.parse(localStorage.getItem("grades") || "[]").filter((g) => g.studentId === userData.id)
+        // Get session and user
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          window.location.href = "/";
+          return;
+        }
 
-      setStats({
-        subjects: subjects.length,
-        attendanceRecords: attendance.length,
-        gradeRecords: grades.length,
-      })
-    }
-  }, [])
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          window.location.href = "/";
+          return;
+        }
 
-  if (!user) return null
+        // Get student data using consistent identifier (email or user_id)
+        const { data: studentData, error: studentError } = await supabase
+          .from("students")
+          .select("id, subjects") // Make sure to select id for attendance query
+          .eq("email", user.email) // Changed from email to user_id for consistency
+          .single();
+
+        if (studentError) throw studentError;
+        if (!studentData) {
+          throw new Error("Student record not found");
+        }
+
+        // Count enrolled subjects (improved parsing without replace)
+        let enrolledSubjects = 0;
+        if (studentData?.subjects) {
+          if (typeof studentData.subjects === "string") {
+            try {
+              enrolledSubjects = JSON.parse(studentData.subjects).length;
+            } catch {
+              enrolledSubjects = 1;
+            }
+          } else if (Array.isArray(studentData.subjects)) {
+            enrolledSubjects = studentData.subjects.length;
+          } else {
+            enrolledSubjects = 1;
+          }
+        }
+
+        // Count attendance records using student's id from students table
+        const { count: attendanceCount, error: attendanceError } = await supabase
+          .from("attendance")
+          .select("*", { count: "exact", head: true })
+          .eq("student_id", studentData.id); // Use studentData.id instead of user.id
+
+        if (attendanceError) throw attendanceError;
+
+        setStats({
+          subjects: enrolledSubjects,
+          attendanceRecords: attendanceCount || 0,
+        });
+
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError(err.message || "Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // ... rest of the component remains the same ...
+  if (loading) {
+    return (
+      <StudentLayout title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <StudentLayout title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
 
   return (
     <StudentLayout title="Dashboard">
@@ -49,29 +128,35 @@ export default function StudentDashboard() {
           </div>
           <div className="text-2xl font-bold">{stats.attendanceRecords}</div>
         </div>
-      
       </div>
 
       <div className="mt-8 grid gap-4">
-        
-
         <div className="bg-white rounded-lg border border-red-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="p-4 border-b border-red-100">
             <h3 className="text-lg font-bold text-red-800">Quick Links</h3>
           </div>
           <div className="p-4 space-y-2">
-            <a href="/student/attendance" className="block p-2 text-sm rounded-lg hover:bg-red-50 transition-colors">
+            <a
+              href="/student/attendance"
+              className="block p-2 text-sm rounded-lg hover:bg-red-50 transition-colors"
+            >
               View Attendance
             </a>
-            <a href="/student/grades" className="block p-2 text-sm rounded-lg hover:bg-red-50 transition-colors">
+            <a
+              href="/student/grades"
+              className="block p-2 text-sm rounded-lg hover:bg-red-50 transition-colors"
+            >
               View Grades
             </a>
-            <a href="/student/profile" className="block p-2 text-sm rounded-lg hover:bg-red-50 transition-colors">
+            <a
+              href="/student/profile"
+              className="block p-2 text-sm rounded-lg hover:bg-red-50 transition-colors"
+            >
               Update Profile
             </a>
           </div>
         </div>
       </div>
     </StudentLayout>
-  )
+  );
 }

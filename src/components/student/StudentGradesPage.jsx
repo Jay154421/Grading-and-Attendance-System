@@ -1,81 +1,166 @@
-import React, { useState, useEffect } from "react"
-import StudentLayout from "../layout/student-layout"
+import React, { useState, useEffect } from "react";
+import StudentLayout from "../layout/student-layout";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function StudentGradesPage() {
-  const [subjects, setSubjects] = useState([])
-  const [grades, setGrades] = useState([])
-  const [selectedSubject, setSelectedSubject] = useState("")
-  const [activeTab, setActiveTab] = useState("raw")
-  const [currentUser, setCurrentUser] = useState(null)
-  const [studentData, setStudentData] = useState(null)
+  const [subjects, setSubjects] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [activeTab, setActiveTab] = useState("raw");
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const user = localStorage.getItem("currentUser")
-    if (user) {
-      const userData = JSON.parse(user)
-      setCurrentUser(userData)
-      
-      // Get student data from students array
-      const students = JSON.parse(localStorage.getItem("students") || "[]")
-      const studentRecord = students.find(s => s.id === userData.id)
-      setStudentData(studentRecord)
-    }
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    const storedSubjects = JSON.parse(localStorage.getItem("subjects") || "[]")
-    const storedGrades = JSON.parse(localStorage.getItem("grades") || "[]")
+        // 1. Get authenticated user session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          window.location.href = "/";
+          return;
+        }
 
-    setSubjects(storedSubjects)
-    setGrades(storedGrades)
-  }, [])
+        // 2. Get user details
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          window.location.href = "/";
+          return;
+        }
 
+     
+
+        // 3. Get student record using email (consistent with other pages)
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('id, subjects')
+          .eq('email', user.email)
+          .single();
+
+        if (studentError) throw studentError;
+        if (!studentData) {
+          throw new Error("Student record not found");
+        }
+
+     
+
+        // 4. Get enrolled subjects (with proper error handling)
+        let enrolledSubjectIds = [];
+        if (studentData.subjects) {
+          try {
+            enrolledSubjectIds = Array.isArray(studentData.subjects) 
+              ? studentData.subjects 
+              : JSON.parse(studentData.subjects);
+          } catch (e) {
+            console.error("Error parsing subjects:", e);
+            throw new Error("Failed to parse enrolled subjects");
+          }
+        }
+
+        // 5. Get subjects data (only enrolled subjects)
+        const { data: subjectsData, error: subjectsError } = await supabase
+          .from('subjects')
+          .select('*')
+          .in('id', enrolledSubjectIds);
+
+        if (subjectsError) throw subjectsError;
+        setSubjects(subjectsData || []);
+
+        // 6. Get grades (only for this student and enrolled subjects)
+        const { data: gradesData, error: gradesError } = await supabase
+          .from('grades')
+          .select('*')
+          .eq('student_id', studentData.id)
+          .in('subject_id', enrolledSubjectIds);
+
+        if (gradesError) throw gradesError;
+        setGrades(gradesData || []);
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError(error.message || "Failed to load grade data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // ... rest of the component remains the same ...
   const getGradesBySubject = () => {
-    if (!currentUser) return {}
+    if (!grades.length) return {};
     
-    // Get all grades for this student
-    const filteredGrades = grades.filter(grade => 
-      grade.studentId === currentUser.id && 
-      (selectedSubject === "" || grade.subjectId === selectedSubject)
-    )
+    const filteredGrades = selectedSubject
+      ? grades.filter(grade => grade.subject_id === selectedSubject)
+      : grades;
 
-    // Group by subject and term
-    const groupedGrades = {}
+    const groupedGrades = {};
     
     filteredGrades.forEach(grade => {
-      if (!groupedGrades[grade.subjectId]) {
-        groupedGrades[grade.subjectId] = {
+      if (!groupedGrades[grade.subject_id]) {
+        groupedGrades[grade.subject_id] = {
           prelim: 0,
           midterm: 0,
           semifinal: 0,
           final: 0
-        }
+        };
       }
-      groupedGrades[grade.subjectId][grade.term] = grade.grade
-    })
+      groupedGrades[grade.subject_id][grade.term] = grade.grade;
+    });
 
-    return groupedGrades
-  }
+    return groupedGrades;
+  };
 
   const calculateCumulativeGrades = (rawGrades) => {
-    const prelimGrade = rawGrades.prelim
-    const midtermGrade = (prelimGrade + rawGrades.midterm) / 2
-    const semifinalGrade = (midtermGrade + rawGrades.semifinal) / 2
-    const finalGrade = (semifinalGrade + rawGrades.final) / 2
+    const prelimGrade = rawGrades.prelim || 0;
+    const midtermGrade = (prelimGrade + (rawGrades.midterm || 0)) / 2;
+    const semifinalGrade = (midtermGrade + (rawGrades.semifinal || 0)) / 2;
+    const finalGrade = (semifinalGrade + (rawGrades.final || 0)) / 2;
 
     return {
       prelim: prelimGrade,
       midterm: midtermGrade,
       semifinal: semifinalGrade,
       final: finalGrade,
-    }
+    };
+  };
+
+  const isPassingGrade = (grade) => grade > 0 && grade <= 3.0;
+
+  const gradesBySubject = getGradesBySubject();
+  const enrolledSubjects = subjects;
+
+  if (loading) {
+    return (
+      <StudentLayout title="Grades">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+        </div>
+      </StudentLayout>
+    );
   }
 
-  const isPassingGrade = (grade) => grade <= 3.0
-
-  const gradesBySubject = getGradesBySubject()
-
-  // Filter subjects that this student is enrolled in
-  const enrolledSubjects = subjects.filter(subject => 
-    studentData?.subjects?.includes(subject.id))
+  if (error) {
+    return (
+      <StudentLayout title="Grades">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
 
   return (
     <StudentLayout title="Grades">
@@ -83,11 +168,16 @@ export default function StudentGradesPage() {
         <h2 className="text-2xl font-bold mb-4 text-red-800">My Grades</h2>
         <div className="bg-white rounded-lg border border-red-100 shadow-sm">
           <div className="p-4 border-b border-red-100 bg-red-50">
-            <h3 className="text-lg font-bold text-red-800">Filter by Subject</h3>
+            <h3 className="text-lg font-bold text-red-800">
+              Filter by Subject
+            </h3>
           </div>
           <div className="p-4">
             <div className="space-y-2">
-              <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="subject"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Subject
               </label>
               <select
@@ -111,14 +201,20 @@ export default function StudentGradesPage() {
       <div className="mb-4">
         <div className="flex border-b border-red-100">
           <button
-            className={`py-2 px-4 ${activeTab === "raw" ? "border-b-2 border-red-600 font-medium text-red-700" : "text-gray-600"}`}
+            className={`py-2 px-4 ${
+              activeTab === "raw"
+                ? "border-b-2 border-red-600 font-medium text-red-700"
+                : "text-gray-600"
+            }`}
             onClick={() => setActiveTab("raw")}
           >
             Raw Grades
           </button>
           <button
             className={`py-2 px-4 ${
-              activeTab === "cumulative" ? "border-b-2 border-red-600 font-medium text-red-700" : "text-gray-600"
+              activeTab === "cumulative"
+                ? "border-b-2 border-red-600 font-medium text-red-700"
+                : "text-gray-600"
             }`}
             onClick={() => setActiveTab("cumulative")}
           >
@@ -132,8 +228,8 @@ export default function StudentGradesPage() {
           <div className="p-4 border-b border-red-100 bg-red-50">
             <h3 className="text-lg font-bold text-red-800">Raw Grades</h3>
             <p className="text-sm text-gray-500 mt-1">
-              {selectedSubject 
-                ? subjects.find(s => s.id === selectedSubject)?.name 
+              {selectedSubject
+                ? subjects.find((s) => s.id === selectedSubject)?.name
                 : "All Subjects"}
               <span className="ml-2 text-red-600">
                 ({Object.keys(gradesBySubject).length} subjects)
@@ -142,7 +238,9 @@ export default function StudentGradesPage() {
           </div>
           <div className="p-4">
             {Object.keys(gradesBySubject).length === 0 ? (
-              <p className="text-center py-4 text-gray-500">No grade records found.</p>
+              <p className="text-center py-4 text-gray-500">
+                No grade records found.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -156,26 +254,65 @@ export default function StudentGradesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(gradesBySubject).map(([subjectId, terms]) => {
-                      const subject = subjects.find((s) => s.id === subjectId)
-                      return (
-                        <tr key={subjectId} className="border-b border-red-100 hover:bg-red-50">
-                          <td className="p-3">{subject ? `${subject.code} - ${subject.name}` : "Unknown"}</td>
-                          <td className={`p-3 ${!isPassingGrade(terms.prelim) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {terms.prelim > 0 ? terms.prelim.toFixed(2) : "-"}
-                          </td>
-                          <td className={`p-3 ${!isPassingGrade(terms.midterm) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {terms.midterm > 0 ? terms.midterm.toFixed(2) : "-"}
-                          </td>
-                          <td className={`p-3 ${!isPassingGrade(terms.semifinal) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {terms.semifinal > 0 ? terms.semifinal.toFixed(2) : "-"}
-                          </td>
-                          <td className={`p-3 ${!isPassingGrade(terms.final) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {terms.final > 0 ? terms.final.toFixed(2) : "-"}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {Object.entries(gradesBySubject).map(
+                      ([subjectId, terms]) => {
+                        const subject = subjects.find(
+                          (s) => s.id === subjectId
+                        );
+                        return (
+                          <tr
+                            key={subjectId}
+                            className="border-b border-red-100 hover:bg-red-50"
+                          >
+                            <td className="p-3">
+                              {subject
+                                ? `${subject.code} - ${subject.name}`
+                                : "Unknown"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(terms.prelim)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {terms.prelim > 0 ? terms.prelim.toFixed(2) : "-"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(terms.midterm)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {terms.midterm > 0
+                                ? terms.midterm.toFixed(2)
+                                : "-"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(terms.semifinal)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {terms.semifinal > 0
+                                ? terms.semifinal.toFixed(2)
+                                : "-"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(terms.final)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {terms.final > 0 ? terms.final.toFixed(2) : "-"}
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -187,10 +324,12 @@ export default function StudentGradesPage() {
       {activeTab === "cumulative" && (
         <div className="bg-white rounded-lg border border-red-100 shadow-sm">
           <div className="p-4 border-b border-red-100 bg-red-50">
-            <h3 className="text-lg font-bold text-red-800">Cumulative Grades</h3>
+            <h3 className="text-lg font-bold text-red-800">
+              Cumulative Grades
+            </h3>
             <p className="text-sm text-gray-500 mt-1">
-              {selectedSubject 
-                ? subjects.find(s => s.id === selectedSubject)?.name 
+              {selectedSubject
+                ? subjects.find((s) => s.id === selectedSubject)?.name
                 : "All Subjects"}
               <span className="ml-2 text-red-600">
                 ({Object.keys(gradesBySubject).length} subjects)
@@ -199,7 +338,9 @@ export default function StudentGradesPage() {
           </div>
           <div className="p-4">
             {Object.keys(gradesBySubject).length === 0 ? (
-              <p className="text-center py-4 text-gray-500">No grade records found.</p>
+              <p className="text-center py-4 text-gray-500">
+                No grade records found.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -214,39 +355,85 @@ export default function StudentGradesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(gradesBySubject).map(([subjectId, rawGrades]) => {
-                      const subject = subjects.find((s) => s.id === subjectId)
-                      const cumulativeGrades = calculateCumulativeGrades(rawGrades)
-                      const finalGrade = cumulativeGrades.final
-                      const isPassing = isPassingGrade(finalGrade)
+                    {Object.entries(gradesBySubject).map(
+                      ([subjectId, rawGrades]) => {
+                        const subject = subjects.find(
+                          (s) => s.id === subjectId
+                        );
+                        const cumulativeGrades =
+                          calculateCumulativeGrades(rawGrades);
+                        const finalGrade = cumulativeGrades.final;
+                        const isPassing = isPassingGrade(finalGrade);
 
-                      return (
-                        <tr key={subjectId} className="border-b border-red-100 hover:bg-red-50">
-                          <td className="p-3">{subject ? `${subject.code} - ${subject.name}` : "Unknown"}</td>
-                          <td className={`p-3 ${!isPassingGrade(cumulativeGrades.prelim) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {cumulativeGrades.prelim > 0 ? cumulativeGrades.prelim.toFixed(2) : "-"}
-                          </td>
-                          <td className={`p-3 ${!isPassingGrade(cumulativeGrades.midterm) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {cumulativeGrades.midterm > 0 ? cumulativeGrades.midterm.toFixed(2) : "-"}
-                          </td>
-                          <td className={`p-3 ${!isPassingGrade(cumulativeGrades.semifinal) ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {cumulativeGrades.semifinal > 0 ? cumulativeGrades.semifinal.toFixed(2) : "-"}
-                          </td>
-                          <td className={`p-3 ${!isPassing ? "text-red-600 font-medium" : "text-green-600"}`}>
-                            {finalGrade > 0 ? finalGrade.toFixed(2) : "-"}
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className={`${
-                                isPassing ? "bg-green-500" : "bg-red-500"
-                              } text-white text-xs px-2 py-1 rounded-full`}
+                        return (
+                          <tr
+                            key={subjectId}
+                            className="border-b border-red-100 hover:bg-red-50"
+                          >
+                            <td className="p-3">
+                              {subject
+                                ? `${subject.code} - ${subject.name}`
+                                : "Unknown"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(cumulativeGrades.prelim)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
                             >
-                              {finalGrade > 0 ? (isPassing ? "Passed" : "Failed") : "Pending"}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
+                              {cumulativeGrades.prelim > 0
+                                ? cumulativeGrades.prelim.toFixed(2)
+                                : "-"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(cumulativeGrades.midterm)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {cumulativeGrades.midterm > 0
+                                ? cumulativeGrades.midterm.toFixed(2)
+                                : "-"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassingGrade(cumulativeGrades.semifinal)
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {cumulativeGrades.semifinal > 0
+                                ? cumulativeGrades.semifinal.toFixed(2)
+                                : "-"}
+                            </td>
+                            <td
+                              className={`p-3 ${
+                                !isPassing
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {finalGrade > 0 ? finalGrade.toFixed(2) : "-"}
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`${
+                                  isPassing ? "bg-green-500" : "bg-red-500"
+                                } text-white text-xs px-2 py-1 rounded-full`}
+                              >
+                                {finalGrade > 0
+                                  ? isPassing
+                                    ? "Passed"
+                                    : "Failed"
+                                  : "Pending"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -255,5 +442,5 @@ export default function StudentGradesPage() {
         </div>
       )}
     </StudentLayout>
-  )
+  );
 }
