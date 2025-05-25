@@ -1,10 +1,10 @@
-// pages/teacher/reports.jsx
-"use client"
 
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
 import { FileDown } from "lucide-react"
 import { supabase } from "../../lib/supabaseClient"
+import { jsPDF } from "jspdf"
+import autoTable from "jspdf-autotable"
 
 export default function ReportsPage() {
   const [subjects, setSubjects] = useState([])
@@ -13,11 +13,9 @@ export default function ReportsPage() {
   const [gradeRecords, setGradeRecords] = useState([])
   const [selectedSubject, setSelectedSubject] = useState("")
   const [activeTab, setActiveTab] = useState("attendance")
-  // Removed unused loading state
 
   useEffect(() => {
     const fetchData = async () => {
-      // Removed setLoading call
       const { data: subjectsData } = await supabase.from('subjects').select('*')
       const { data: studentsData } = await supabase.from('students').select('*')
       const { data: attendanceData } = await supabase.from('attendance').select('*')
@@ -27,7 +25,6 @@ export default function ReportsPage() {
       if (studentsData) setStudents(studentsData)
       if (attendanceData) setAttendanceRecords(attendanceData)
       if (gradesData) setGradeRecords(gradesData)
-      // Removed setLoading call
     }
     fetchData()
   }, [])
@@ -136,14 +133,134 @@ export default function ReportsPage() {
     if (!selectedSubject) return
     const subject = subjects.find((s) => s.id === selectedSubject)
     if (!subject) return
-    alert("PDF export functionality would be implemented here with a library like jsPDF")
+
+    const relevantAttendance = attendanceRecords.filter((record) => record.subject_id === selectedSubject)
+    const attendanceByDate = relevantAttendance.reduce((acc, record) => {
+      if (!acc[record.date]) {
+        acc[record.date] = {}
+      }
+      acc[record.date][record.student_id] = record.status
+      return acc
+    }, {})
+
+    const dates = Object.keys(attendanceByDate).sort()
+    
+    // Prepare data for the table
+    const headers = ["Student ID", "Student Name", ...dates]
+    const data = students.map(student => {
+      const row = [student.student_id, student.full_name]
+      dates.forEach(date => {
+        const status = attendanceByDate[date][student.id] || "N/A"
+        row.push(status)
+      })
+      return row
+    })
+
+    // Create PDF
+    const doc = new jsPDF()
+    
+    // Title
+    doc.setFontSize(18)
+    doc.text(`${subject.code} - ${subject.name} Attendance Report`, 14, 20)
+    doc.setFontSize(12)
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30)
+    
+    // Table - use the imported autoTable function directly
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      startY: 40,
+      styles: {
+        cellPadding: 3,
+        fontSize: 10,
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [239, 68, 68],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [255, 245, 245]
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 'auto' }
+      },
+      margin: { top: 40 }
+    })
+
+    doc.save(`${subject.code}_attendance.pdf`)
   }
 
   const exportGradesPDF = () => {
     if (!selectedSubject) return
     const subject = subjects.find((s) => s.id === selectedSubject)
     if (!subject) return
-    alert("PDF export functionality would be implemented here with a library like jsPDF")
+
+    // Prepare data for the table
+    const headers = [
+      "Student ID",
+      "Student Name",
+      "Prelim",
+      "Midterm",
+      "Semi-Final",
+      "Final",
+      "Status"
+    ]
+
+    const data = students.map(student => {
+      const grades = calculateCumulativeGrades(student.id)
+      const finalGrade = grades.cumulative.final
+      const status = finalGrade <= 3.0 ? "Passed" : "Failed"
+
+      return [
+        student.student_id,
+        student.full_name,
+        grades.cumulative.prelim.toFixed(2),
+        grades.cumulative.midterm.toFixed(2),
+        grades.cumulative.semifinal.toFixed(2),
+        grades.cumulative.final.toFixed(2),
+        status
+      ]
+    })
+
+    // Create PDF
+    const doc = new jsPDF()
+    
+    // Title
+    doc.setFontSize(18)
+    doc.text(`${subject.code} - ${subject.name} Grade Report`, 14, 20)
+    doc.setFontSize(12)
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30)
+    doc.text(`Passing Grade: 3.0`, 14, 40)
+    
+    // Table - use the imported autoTable function directly
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      startY: 50,
+      styles: {
+        cellPadding: 3,
+        fontSize: 10,
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [239, 68, 68],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [255, 245, 245]
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 'auto' }
+      },
+      margin: { top: 50 }
+    })
+
+    doc.save(`${subject.code}_grades.pdf`)
   }
 
   return (

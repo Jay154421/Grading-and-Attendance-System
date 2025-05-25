@@ -39,6 +39,7 @@ export default function StudentAttendancePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
           window.location.href = "/";
@@ -127,20 +128,10 @@ export default function StudentAttendancePage() {
     );
   };
 
-  if (loading) {
-    return (
-      <StudentLayout title="Attendance">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-        </div>
-      </StudentLayout>
-    );
-  }
-
   return (
     <StudentLayout title="Attendance">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-4 text-red-800">My Attendance</h2>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">My Attendance</h2>
         <div className="border border-red-100 rounded-lg overflow-hidden shadow-sm">
           <div className="p-4 border-b border-red-100 bg-red-50">
             <h3 className="text-lg font-semibold text-red-800">Filter by Subject</h3>
@@ -184,7 +175,9 @@ export default function StudentAttendancePage() {
           </div>
         </div>
         <div className="p-4 bg-white">
-          {filteredAttendance.length === 0 ? (
+          {loading ? (
+            <p className="text-center py-4 text-gray-500">Loading attendance data...</p>
+          ) : filteredAttendance.length === 0 ? (
             <p className="text-center py-4 text-gray-500">No attendance records found.</p>
           ) : (
             <div className="overflow-x-auto">

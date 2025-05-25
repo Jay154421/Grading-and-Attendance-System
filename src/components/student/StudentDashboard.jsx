@@ -33,8 +33,8 @@ export default function StudentDashboard() {
         // Get student data using consistent identifier (email or user_id)
         const { data: studentData, error: studentError } = await supabase
           .from("students")
-          .select("id, subjects") // Make sure to select id for attendance query
-          .eq("email", user.email) // Changed from email to user_id for consistency
+          .select("id, subjects")
+          .eq("email", user.email)
           .single();
 
         if (studentError) throw studentError;
@@ -62,7 +62,7 @@ export default function StudentDashboard() {
         const { count: attendanceCount, error: attendanceError } = await supabase
           .from("attendance")
           .select("*", { count: "exact", head: true })
-          .eq("student_id", studentData.id); // Use studentData.id instead of user.id
+          .eq("student_id", studentData.id);
 
         if (attendanceError) throw attendanceError;
 
@@ -81,17 +81,6 @@ export default function StudentDashboard() {
 
     fetchData();
   }, []);
-
-  // ... rest of the component remains the same ...
-  if (loading) {
-    return (
-      <StudentLayout title="Dashboard">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-        </div>
-      </StudentLayout>
-    );
-  }
 
   if (error) {
     return (
@@ -119,14 +108,14 @@ export default function StudentDashboard() {
             <h3 className="text-sm font-medium">Enrolled Subjects</h3>
             <BookOpen className="h-4 w-4 text-red-500" />
           </div>
-          <div className="text-2xl font-bold">{stats.subjects}</div>
+          <div className="text-2xl font-bold">{loading ? "--" : stats.subjects}</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-red-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="text-sm font-medium">Attendance Records</h3>
             <ClipboardCheck className="h-4 w-4 text-red-500" />
           </div>
-          <div className="text-2xl font-bold">{stats.attendanceRecords}</div>
+          <div className="text-2xl font-bold">{loading ? "--" : stats.attendanceRecords}</div>
         </div>
       </div>
 

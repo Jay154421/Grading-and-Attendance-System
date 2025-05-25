@@ -9,8 +9,6 @@ export default function TeacherDashboard() {
   const [stats, setStats] = useState({
     subjects: 0,
     students: 0,
-    attendanceRecords: 0,
-    gradeRecords: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -26,19 +24,9 @@ export default function TeacherDashboard() {
         .from('students')
         .select('*', { count: 'exact', head: true })
 
-      const { count: attendanceCount } = await supabase
-        .from('attendance')
-        .select('*', { count: 'exact', head: true })
-
-      const { count: gradesCount } = await supabase
-        .from('grades')
-        .select('*', { count: 'exact', head: true })
-
       setStats({
         subjects: subjectsCount || 0,
         students: studentsCount || 0,
-        attendanceRecords: attendanceCount || 0,
-        gradeRecords: gradesCount || 0,
       })
       setLoading(false)
     }

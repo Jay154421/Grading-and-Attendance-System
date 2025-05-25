@@ -7,7 +7,6 @@ export default function StudentGradesPage() {
   const [grades, setGrades] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState("");
   const [activeTab, setActiveTab] = useState("raw");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -31,8 +30,6 @@ export default function StudentGradesPage() {
           return;
         }
 
-     
-
         // 3. Get student record using email (consistent with other pages)
         const { data: studentData, error: studentError } = await supabase
           .from('students')
@@ -44,8 +41,6 @@ export default function StudentGradesPage() {
         if (!studentData) {
           throw new Error("Student record not found");
         }
-
-     
 
         // 4. Get enrolled subjects (with proper error handling)
         let enrolledSubjectIds = [];
@@ -90,7 +85,6 @@ export default function StudentGradesPage() {
     fetchData();
   }, []);
 
-  // ... rest of the component remains the same ...
   const getGradesBySubject = () => {
     if (!grades.length) return {};
     
@@ -134,16 +128,6 @@ export default function StudentGradesPage() {
   const gradesBySubject = getGradesBySubject();
   const enrolledSubjects = subjects;
 
-  if (loading) {
-    return (
-      <StudentLayout title="Grades">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-        </div>
-      </StudentLayout>
-    );
-  }
-
   if (error) {
     return (
       <StudentLayout title="Grades">
@@ -165,7 +149,7 @@ export default function StudentGradesPage() {
   return (
     <StudentLayout title="Grades">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-4 text-red-800">My Grades</h2>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">My Grades</h2>
         <div className="bg-white rounded-lg border border-red-100 shadow-sm">
           <div className="p-4 border-b border-red-100 bg-red-50">
             <h3 className="text-lg font-bold text-red-800">
@@ -237,7 +221,9 @@ export default function StudentGradesPage() {
             </p>
           </div>
           <div className="p-4">
-            {Object.keys(gradesBySubject).length === 0 ? (
+            {loading ? (
+              <p className="text-center py-4 text-gray-500">Loading grades data...</p>
+            ) : Object.keys(gradesBySubject).length === 0 ? (
               <p className="text-center py-4 text-gray-500">
                 No grade records found.
               </p>
@@ -337,7 +323,9 @@ export default function StudentGradesPage() {
             </p>
           </div>
           <div className="p-4">
-            {Object.keys(gradesBySubject).length === 0 ? (
+            {loading ? (
+              <p className="text-center py-4 text-gray-500">Loading cumulative grades...</p>
+            ) : Object.keys(gradesBySubject).length === 0 ? (
               <p className="text-center py-4 text-gray-500">
                 No grade records found.
               </p>

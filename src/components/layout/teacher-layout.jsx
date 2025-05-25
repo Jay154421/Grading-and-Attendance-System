@@ -34,11 +34,6 @@ export default function TeacherLayout({ children, title }) {
         return;
       }
 
-      if (user.user_metadata?.role !== "teacher") {
-        navigate("/");
-        return;
-      }
-
       setUser({
         id: user.id,
         email: user.email,
@@ -60,9 +55,7 @@ export default function TeacherLayout({ children, title }) {
             role: session.user.user_metadata?.role,
             username: session.user.user_metadata?.username || session.user.email.split("@")[0],
           });
-        } else {
-          navigate("/");
-        }
+        } 
       }
     });
 

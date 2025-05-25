@@ -21,7 +21,6 @@ export default function StudentsPage() {
     photo: null,
   })
   const [photoPreview, setPhotoPreview] = useState(null)
-  const [credentials, setCredentials] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -52,12 +51,7 @@ export default function StudentsPage() {
       }
     })
 
-    if (error) return { error: error.message }
-
-    return { 
-      email: studentData.email,
-      password: studentData.password || "password"
-    }
+    if (error) throw new Error(error.message)
   }
 
   const handleAddStudent = async () => {
@@ -66,36 +60,33 @@ export default function StudentsPage() {
       return
     }
 
-    // Register auth account
-    const accountResult = await registerStudentAccount(formData)
-    if (accountResult.error) {
-      alert(accountResult.error)
-      return
-    }
+    try {
+      // Register auth account
+      await registerStudentAccount(formData)
 
-    // Create student record
-    const { data, error } = await supabase
-      .from('students')
-      .insert([{
-        student_id: formData.student_id,
-        full_name: formData.full_name,
-        email: formData.email,
-        subjects: formData.subjects,
-        photo: formData.photo
-      }])
-      .select()
+      // Create student record
+      const { data, error } = await supabase
+        .from('students')
+        .insert([{
+          student_id: formData.student_id,
+          full_name: formData.full_name,
+          email: formData.email,
+          subjects: formData.subjects,
+          photo: formData.photo
+        }])
+        .select()
 
-    if (error) {
-      alert("Error creating student record: " + error.message)
-      return
-    }
+      if (error) {
+        alert("Error creating student record: " + error.message)
+        return
+      }
 
-    setStudents([data[0], ...students])
-    setCredentials(accountResult)
-    setTimeout(() => {
+      setStudents([data[0], ...students])
       setIsAddDialogOpen(false)
       resetForm()
-    }, 5000)
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   const handleEditStudent = async () => {
@@ -185,7 +176,6 @@ export default function StudentsPage() {
     })
     setPhotoPreview(null)
     setCurrentStudent(null)
-    setCredentials(null)
   }
 
   const handlePhotoChange = (e) => {
@@ -218,7 +208,6 @@ export default function StudentsPage() {
           className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 transition-colors shadow-md hover:shadow-lg"
           onClick={() => {
             setIsAddDialogOpen(true)
-            setCredentials(null)
           }}
         >
           <Plus className="h-5 w-5" />
@@ -439,21 +428,6 @@ export default function StudentsPage() {
                   </div>
                 </div>
               </div>
-              
-              {credentials && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-sm text-blue-800 mb-2">Student Account Created</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="text-gray-600">Email:</div>
-                    <div className="font-mono text-blue-700 break-all">{credentials.email}</div>
-                    <div className="text-gray-600">Password:</div>
-                    <div className="font-mono text-blue-700">{credentials.password}</div>
-                  </div>
-                  <p className="text-xs mt-2 text-gray-600">
-                    Please provide these credentials to the student.
-                  </p>
-                </div>
-              )}
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button

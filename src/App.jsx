@@ -13,6 +13,7 @@ import StudentManage from "./components/teacher/StudentsPage";
 import TeacherSubject from "./components/teacher/SubjectsPage";
 import TeacherDashboard from "./components/teacher/TeacherDashboard";
 
+
 function App() {
   return (
     <Router>
