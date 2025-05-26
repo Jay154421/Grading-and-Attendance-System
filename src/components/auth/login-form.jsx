@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import toast, { Toaster } from 'toastr'
+import 'toastr/build/toastr.min.css'
 
 export default function LoginForm() {
   const [activeTab, setActiveTab] = useState("login");
@@ -36,12 +38,17 @@ export default function LoginForm() {
         throw new Error("User data not available");
       }
 
+      toast.success("Login successful! Redirecting...");
+      
       // Redirect based on role
       const role = user.user_metadata?.role || "teacher";
-      window.location.href =
-        role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
+      setTimeout(() => {
+        window.location.href =
+          role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
+      }, 1500);
     } catch (err) {
       setError(err.message || "Invalid email or password");
+      toast.error(err.message || "Login failed. Please try again.");
       console.error("Login error:", err);
     } finally {
       setIsLoading(false);
@@ -55,6 +62,7 @@ export default function LoginForm() {
 
     if (registerData.password !== registerData.confirmPassword) {
       setError("Passwords do not match");
+      toast.error("Passwords do not match");
       setIsLoading(false);
       return;
     }
@@ -80,11 +88,13 @@ export default function LoginForm() {
         });
       }
 
-      setError("Registration successful! You can now login.");
+      toast.success("Registration successful! You can now login.");
+      setError("");
       setActiveTab("login");
       setLoginData({ email: registerData.email, password: "" });
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
+      toast.error(err.message || "Registration failed. Please try again.");
       console.error("Registration error:", err);
     } finally {
       setIsLoading(false);
@@ -92,27 +102,34 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-red-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <Toaster position="top-center" />
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-red-100">
-          <div className="flex">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-red-100">
+          <div className="flex bg-gray-50">
             <button
-              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200 ${
                 activeTab === "login"
-                  ? "border-red-600 text-red-700"
-                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                  ? "border-red-600 text-red-700 bg-white"
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-100"
               }`}
-              onClick={() => setActiveTab("login")}
+              onClick={() => {
+                setActiveTab("login");
+                setError("");
+              }}
             >
               Login
             </button>
             <button
-              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200 ${
                 activeTab === "register"
-                  ? "border-red-600 text-red-700"
-                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                  ? "border-red-600 text-red-700 bg-white"
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-100"
               }`}
-              onClick={() => setActiveTab("register")}
+              onClick={() => {
+                setActiveTab("register");
+                setError("");
+              }}
             >
               Register (Teachers Only)
             </button>
@@ -122,65 +139,82 @@ export default function LoginForm() {
             {activeTab === "login" ? (
               <form onSubmit={handleLogin} className="space-y-6">
                 <div className="text-center">
-                  <h2 className="text-2xl font-bold text-gray-900">Login</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
                   <p className="mt-2 text-sm text-gray-600">
                     Enter your credentials to access your account
                   </p>
                 </div>
 
                 {error && (
-                  <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
-                    <AlertCircle className="h-5 w-5" />
+                  <div className="flex items-start p-3 space-x-2 text-sm text-red-600 bg-red-50 rounded-lg">
+                    <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
                     <div>{error}</div>
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Email
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={loginData.email}
-                    onChange={(e) =>
-                      setLoginData({ ...loginData, email: e.target.value })
-                    }
-                    placeholder="Enter your email"
-                  />
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Email Address
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      required
+                      className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      value={loginData.email}
+                      onChange={(e) =>
+                        setLoginData({ ...loginData, email: e.target.value })
+                      }
+                      placeholder="you@example.com"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Password
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={loginData.password}
-                    onChange={(e) =>
-                      setLoginData({ ...loginData, password: e.target.value })
-                    }
-                    placeholder="Enter your password"
-                  />
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label
+                        htmlFor="password"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Password
+                      </label>
+                      <a
+                        href="/forgot-password"
+                        className="text-xs text-red-600 hover:text-red-800"
+                      >
+                        Forgot password?
+                      </a>
+                    </div>
+                    <input
+                      id="password"
+                      type="password"
+                      required
+                      className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      value={loginData.password}
+                      onChange={(e) =>
+                        setLoginData({ ...loginData, password: e.target.value })
+                      }
+                      placeholder="••••••••"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Logging in..." : "Login"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                      Logging in...
+                    </>
+                  ) : (
+                    "Login"
+                  )}
                 </button>
               </form>
             ) : (
@@ -190,84 +224,89 @@ export default function LoginForm() {
                     Teacher Registration
                   </h2>
                   <p className="mt-2 text-sm text-gray-600">
-                    Create a new teacher account
+                    Create your teacher account
                   </p>
                 </div>
 
                 {error && (
-                  <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
-                    <AlertCircle className="h-5 w-5" />
+                  <div className="flex items-start p-3 space-x-2 text-sm text-red-600 bg-red-50 rounded-lg">
+                    <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
                     <div>{error}</div>
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="reg-email"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Email
-                  </label>
-                  <input
-                    id="reg-email"
-                    type="email"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={registerData.email}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        email: e.target.value,
-                      })
-                    }
-                    placeholder="Enter your email"
-                  />
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="reg-email"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Email Address
+                    </label>
+                    <input
+                      id="reg-email"
+                      type="email"
+                      required
+                      className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      value={registerData.email}
+                      onChange={(e) =>
+                        setRegisterData({
+                          ...registerData,
+                          email: e.target.value,
+                        })
+                      }
+                      placeholder="you@example.com"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="reg-password"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Password
-                  </label>
-                  <input
-                    id="reg-password"
-                    type="password"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={registerData.password}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        password: e.target.value,
-                      })
-                    }
-                    placeholder="Create a password"
-                  />
-                </div>
+                  <div>
+                    <label
+                      htmlFor="reg-password"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Password
+                    </label>
+                    <input
+                      id="reg-password"
+                      type="password"
+                      required
+                      className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      value={registerData.password}
+                      onChange={(e) =>
+                        setRegisterData({
+                          ...registerData,
+                          password: e.target.value,
+                        })
+                      }
+                      placeholder="••••••••"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Minimum 6 characters
+                    </p>
+                  </div>
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="reg-confirm-password"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Confirm Password
-                  </label>
-                  <input
-                    id="reg-confirm-password"
-                    type="password"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={registerData.confirmPassword}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        confirmPassword: e.target.value,
-                      })
-                    }
-                    placeholder="Confirm your password"
-                  />
+                  <div>
+                    <label
+                      htmlFor="reg-confirm-password"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Confirm Password
+                    </label>
+                    <input
+                      id="reg-confirm-password"
+                      type="password"
+                      required
+                      className="block w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      value={registerData.confirmPassword}
+                      onChange={(e) =>
+                        setRegisterData({
+                          ...registerData,
+                          confirmPassword: e.target.value,
+                        })
+                      }
+                      placeholder="••••••••"
+                    />
+                  </div>
                 </div>
 
                 <input
@@ -278,19 +317,28 @@ export default function LoginForm() {
                   }
                 />
 
-                <div className="text-xs text-gray-500 mt-4">
+                <div className="text-xs text-gray-500 mt-2">
                   <p>
-                    Note: Student registration is only available through the
-                    teacher portal after login.
+                    By registering, you agree to our Terms of Service and Privacy Policy.
+                  </p>
+                  <p className="mt-1">
+                    Note: Student accounts can only be created by teachers after login.
                   </p>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Registering..." : "Register Teacher Account"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                      Registering...
+                    </>
+                  ) : (
+                    "Create Teacher Account"
+                  )}
                 </button>
               </form>
             )}

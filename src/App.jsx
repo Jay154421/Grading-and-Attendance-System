@@ -15,22 +15,24 @@ import TeacherDashboard from "./components/teacher/TeacherDashboard";
 
 
 function App() {
+
+
   return (
     <Router>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/student/dashboard" element={<StudentDashboard />} />
-          <Route path="/student/attendance" element={<StudentAttendance />} />
-          <Route path="/student/grades" element={<StudentGrades />} />
-          <Route path="/student/profile" element={<StudentProfile />} />
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/student/dashboard" element={<StudentDashboard />} />
+        <Route path="/student/attendance" element={<StudentAttendance />} />
+        <Route path="/student/grades" element={<StudentGrades />} />
+        <Route path="/student/profile" element={<StudentProfile />} />
 
-          <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
-          <Route path="/teacher/subjects" element={<TeacherSubject />} />
-          <Route path="/teacher/students" element={<StudentManage />} />
-          <Route path="/teacher/attendance" element={<AttendanceManage />} />
-          <Route path="/teacher/grades" element={<GradesManage />} />
-          <Route path="/teacher/reports" element={<Report />} />
-        </Routes>
+        <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
+        <Route path="/teacher/subjects" element={<TeacherSubject />} />
+        <Route path="/teacher/students" element={<StudentManage />} />
+        <Route path="/teacher/attendance" element={<AttendanceManage />} />
+        <Route path="/teacher/grades" element={<GradesManage />} />
+        <Route path="/teacher/reports" element={<Report />} />
+      </Routes>
     </Router>
   );
 }

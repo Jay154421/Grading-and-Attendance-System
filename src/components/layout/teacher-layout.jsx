@@ -17,6 +17,7 @@ export default function TeacherLayout({ children, title }) {
   const [user, setUser] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  
 
   useEffect(() => {
     const checkSession = async () => {
@@ -141,7 +142,7 @@ export default function TeacherLayout({ children, title }) {
         <div className="p-4 border-t border-red-700">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center p-2 border border-red-600 rounded-md hover:bg-red-700 transition-colors"
+            className="w-full flex items-center justify-center p-2 border border-gray-300 rounded-md hover:bg-red-700 transition-colors"
           >
             <FiLogOut className="mr-2" />
             <span>Logout</span>

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
 import { Plus, Pencil, Trash, Upload } from "lucide-react"
 import { supabase } from "../../lib/supabaseClient"
+import 'toastr/build/toastr.min.css';
+import toastr from 'toastr';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([])
@@ -22,6 +24,13 @@ export default function StudentsPage() {
   })
   const [photoPreview, setPhotoPreview] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  toastr.options = {
+    positionClass: 'toast-top-right',
+    preventDuplicates: true,
+    progressBar: true,
+    timeOut: 3000
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,20 +60,21 @@ export default function StudentsPage() {
       }
     })
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      toastr.error("Registration error: " + error.message);
+      throw new Error(error.message);
+    }
   }
 
   const handleAddStudent = async () => {
     if (!formData.student_id || !formData.full_name || !formData.email) {
-      alert("Please fill in all required fields")
-      return
+      toastr.warning("Please fill in all required fields");
+      return;
     }
 
     try {
-      // Register auth account
-      await registerStudentAccount(formData)
+      await registerStudentAccount(formData);
 
-      // Create student record
       const { data, error } = await supabase
         .from('students')
         .insert([{
@@ -77,20 +87,21 @@ export default function StudentsPage() {
         .select()
 
       if (error) {
-        alert("Error creating student record: " + error.message)
-        return
+        toastr.error("Error creating student record: " + error.message);
+        return;
       }
 
-      setStudents([data[0], ...students])
-      setIsAddDialogOpen(false)
-      resetForm()
+      setStudents([data[0], ...students]);
+      setIsAddDialogOpen(false);
+      resetForm();
+      toastr.success("Student added successfully");
     } catch (err) {
-      alert(err.message)
+      toastr.error(err.message);
     }
   }
 
   const handleEditStudent = async () => {
-    if (!currentStudent) return
+    if (!currentStudent) return;
 
     const { error } = await supabase
       .from('students')
@@ -103,48 +114,53 @@ export default function StudentsPage() {
       .eq('id', currentStudent.id)
 
     if (error) {
-      alert("Error updating student: " + error.message)
-      return
+      toastr.error("Error updating student: " + error.message);
+      return;
     }
 
-    // Update auth user if email changed
     if (formData.email !== currentStudent.email) {
       await supabase.auth.admin.updateUserById(currentStudent.id, {
         email: formData.email,
         user_metadata: {
           full_name: formData.full_name
         }
-      })
+      }).catch(err => {
+        toastr.error("Error updating auth user: " + err.message);
+      });
     }
 
     const updatedStudents = students.map((student) =>
       student.id === currentStudent.id ? { ...student, ...formData } : student
-    )
-    setStudents(updatedStudents)
-    setIsEditDialogOpen(false)
-    resetForm()
+    );
+    setStudents(updatedStudents);
+    setIsEditDialogOpen(false);
+    resetForm();
+    toastr.success("Student updated successfully");
   }
 
   const handleDeleteStudent = async () => {
-    if (!currentStudent) return
+    if (!currentStudent) return;
 
-    // Delete student record
-    const { error } = await supabase
-      .from('students')
-      .delete()
-      .eq('id', currentStudent.id)
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', currentStudent.id);
 
-    if (error) {
-      alert("Error deleting student: " + error.message)
-      return
+      if (error) {
+        toastr.error("Error deleting student: " + error.message);
+        return;
+      }
+
+      await supabase.auth.admin.deleteUser(currentStudent.id);
+      
+      const updatedStudents = students.filter((student) => student.id !== currentStudent.id);
+      setStudents(updatedStudents);
+      setIsDeleteDialogOpen(false);
+      toastr.success("Student deleted successfully");
+    } catch (err) {
+      toastr.error("Error deleting student: " + err.message);
     }
-
-    // Delete auth user
-    await supabase.auth.admin.deleteUser(currentStudent.id)
-
-    const updatedStudents = students.filter((student) => student.id !== currentStudent.id)
-    setStudents(updatedStudents)
-    setIsDeleteDialogOpen(false)
   }
 
   const openEditDialog = (student) => {
