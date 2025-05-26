@@ -1,6 +1,26 @@
 import React, { useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import toastr from "toastr";
+import "toastr/build/toastr.min.css";
+
+// Configure toastr
+toastr.options = {
+  closeButton: true,
+  debug: false,
+  newestOnTop: true,
+  progressBar: true,
+  positionClass: "toast-top-right",
+  preventDuplicates: false,
+  showDuration: "300",
+  hideDuration: "1000",
+  timeOut: "5000",
+  extendedTimeOut: "1000",
+  showEasing: "swing",
+  hideEasing: "linear",
+  showMethod: "fadeIn",
+  hideMethod: "fadeOut"
+};
 
 export default function LoginForm() {
   const [activeTab, setActiveTab] = useState("login");
@@ -11,12 +31,10 @@ export default function LoginForm() {
     confirmPassword: "",
     role: "teacher",
   });
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
     setIsLoading(true);
 
     try {
@@ -41,7 +59,7 @@ export default function LoginForm() {
       window.location.href =
         role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      toastr.error(err.message || "Invalid email or password");
       console.error("Login error:", err);
     } finally {
       setIsLoading(false);
@@ -50,11 +68,10 @@ export default function LoginForm() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setError("");
     setIsLoading(true);
 
     if (registerData.password !== registerData.confirmPassword) {
-      setError("Passwords do not match");
+      toastr.error("Passwords do not match");
       setIsLoading(false);
       return;
     }
@@ -80,11 +97,11 @@ export default function LoginForm() {
         });
       }
 
-      setError("Registration successful! You can now login.");
+      toastr.success("Registration successful! You can now login.");
       setActiveTab("login");
       setLoginData({ email: registerData.email, password: "" });
     } catch (err) {
-      setError(err.message || "Registration failed. Please try again.");
+      toastr.error(err.message || "Registration failed. Please try again.");
       console.error("Registration error:", err);
     } finally {
       setIsLoading(false);
@@ -127,13 +144,6 @@ export default function LoginForm() {
                     Enter your credentials to access your account
                   </p>
                 </div>
-
-                {error && (
-                  <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
-                    <AlertCircle className="h-5 w-5" />
-                    <div>{error}</div>
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <label
@@ -193,13 +203,6 @@ export default function LoginForm() {
                     Create a new teacher account
                   </p>
                 </div>
-
-                {error && (
-                  <div className="flex items-start p-4 space-x-2 text-sm text-red-600 bg-red-50 rounded-md">
-                    <AlertCircle className="h-5 w-5" />
-                    <div>{error}</div>
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <label
