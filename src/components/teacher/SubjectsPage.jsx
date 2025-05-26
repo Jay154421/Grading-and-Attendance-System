@@ -69,8 +69,17 @@ export default function SubjectsPage() {
       subject => subject.name.toLowerCase() === formData.name.toLowerCase()
     );
 
+      const isDuplicateCode = subjects.some(
+      subject => subject.code.toLowerCase() === formData.code.toLowerCase()
+    );
+
     if (isDuplicate) {
       toastr.warning("A subject with this name already exists")
+      return
+    }
+
+       if (isDuplicateCode) {
+      toastr.warning("A subject with this Subject Code already exists")
       return
     }
 
