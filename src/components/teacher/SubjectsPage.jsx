@@ -64,6 +64,16 @@ export default function SubjectsPage() {
 
       if (error) throw error
 
+      
+      const isDuplicate = subjects.some(
+      subject => subject.name.toLowerCase() === formData.name.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      toastr.warning("A subject with this name already exists")
+      return
+    }
+
       setSubjects([data[0], ...subjects])
       setIsAddDialogOpen(false)
       resetForm()
