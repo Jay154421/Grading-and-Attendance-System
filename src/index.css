@@ -1,1 +1,42 @@
 @import "tailwindcss";
+
+@keyframes sidebar-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sidebar-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-drawer-in {
+  animation: sidebar-drawer-in 200ms ease-out;
+}
+
+.animate-fade-in {
+  animation: sidebar-fade-in 150ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 150ms ease-out;
+}

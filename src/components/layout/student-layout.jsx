@@ -10,6 +10,16 @@ import {
   FiX 
 } from "react-icons/fi";
 import { supabase } from "../../lib/supabaseClient";
+import { toast } from "../ui/toastApi";
+import Sidebar from "./Sidebar";
+import LoadingScreen from "./LoadingScreen";
+
+const NAV_ITEMS = [
+  { to: "/student/dashboard", label: "Dashboard", icon: FiHome },
+  { to: "/student/attendance", label: "Attendance", icon: FiCalendar },
+  { to: "/student/grades", label: "Grades", icon: FiAward },
+  { to: "/student/profile", label: "Profile", icon: FiUser },
+];
 
 export default function StudentLayout({ children, title }) {
   const [user, setUser] = useState(null);
@@ -85,7 +95,7 @@ export default function StudentLayout({ children, title }) {
       if (error) throw error;
       navigate("/");
     } catch (error) {
-      console.error("Error logging out:", error);
+      toast.error("You were not signed out: " + (error.message || "unknown error"));
     }
   };
 
@@ -93,99 +103,68 @@ export default function StudentLayout({ children, title }) {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  if (!user) {
+    return <LoadingScreen label="Loading profile" />;
+  }
+
   return (
-    <div className="flex h-screen bg-red-50">
-      {/* Sidebar for desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-red-800 text-white border-r">
-        <div className="p-4 border-b border-red-700">
-          <h2 className="text-xl font-bold">Student Portal</h2>
-          <p className="text-sm text-red-200">Welcome, {user?.username || "Student"}</p>
-        </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <a href="/student/dashboard" className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors">
-            <FiHome className="mr-3" />
-            <span>Dashboard</span>
-          </a>
-          <a href="/student/attendance" className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors">
-            <FiCalendar className="mr-3" />
-            <span>Attendance</span>
-          </a>
-          <a href="/student/grades" className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors">
-            <FiAward className="mr-3" />
-            <span>Grades</span>
-          </a>
-          <a href="/student/profile" className="flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors">
-            <FiUser className="mr-3" />
-            <span>Profile</span>
-          </a>
-        </nav>
-        <div className="p-4 border-t border-red-700">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center p-2 border border-gray-300 rounded-md hover:bg-red-700 transition-colors"
-          >
-            <FiLogOut className="mr-2" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </aside>
+    <div className="flex h-screen bg-gray-50">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-red-600 focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
+      <Sidebar
+        portal="Student"
+        username={user?.username || "Student"}
+        items={NAV_ITEMS}
+        mobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onLogout={handleLogout}
+      />
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white h-16 flex items-center justify-between px-4 shadow-sm">
           <div className="flex items-center">
-            <button className="md:hidden mr-2 text-red-600" onClick={toggleMobileMenu}>
-              {isMobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
+            <button
+              type="button"
+              className="mr-1 flex h-11 w-11 items-center justify-center rounded-lg text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 md:hidden"
+              onClick={toggleMobileMenu}
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <FiX size={24} aria-hidden="true" /> : <FiMenu size={24} aria-hidden="true" />}
             </button>
             <h1 className="text-xl font-bold text-gray-800">{title}</h1>
           </div>
           <div className="flex items-center space-x-2">
             {user?.photo && (
-              <img 
-                src={user.photo} 
-                alt="Profile" 
-                className="h-8 w-8 rounded-full object-cover mr-2"
+              <img
+                src={user.photo}
+                alt=""
+                className="h-8 w-8 rounded-full object-cover"
               />
             )}
             <div className="md:hidden">
               <button
+                type="button"
                 onClick={handleLogout}
-                className="p-2 border border-red-600 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center"
+                className="flex min-h-11 items-center rounded-lg border border-red-600 px-3 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
               >
-                <FiLogOut className="mr-1" />
+                <FiLogOut className="mr-1" aria-hidden="true" />
                 <span>Logout</span>
               </button>
             </div>
           </div>
         </header>
 
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden bg-white shadow-sm">
-            <nav className="p-4 space-y-2">
-              <a href="/student/dashboard" className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors">
-                <FiHome className="mr-3" />
-                <span>Dashboard</span>
-              </a>
-              <a href="/student/attendance" className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors">
-                <FiCalendar className="mr-3" />
-                <span>Attendance</span>
-              </a>
-              <a href="/student/grades" className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors">
-                <FiAward className="mr-3" />
-                <span>Grades</span>
-              </a>
-              <a href="/student/profile" className="flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors">
-                <FiUser className="mr-3" />
-                <span>Profile</span>
-              </a>
-            </nav>
-          </div>
-        )}
-
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 focus:outline-none">
+          {children}
+        </main>
       </div>
     </div>
   );

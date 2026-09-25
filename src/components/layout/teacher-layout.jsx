@@ -12,6 +12,18 @@ import {
 } from "react-icons/fi";
 import { supabase } from "../../lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { toast } from "../ui/toastApi";
+import Sidebar from "./Sidebar";
+import LoadingScreen from "./LoadingScreen";
+
+const NAV_ITEMS = [
+  { to: "/teacher/dashboard", label: "Dashboard", icon: FiHome },
+  { to: "/teacher/subjects", label: "Subjects", icon: FiBook },
+  { to: "/teacher/students", label: "Students", icon: FiUsers },
+  { to: "/teacher/attendance", label: "Attendance", icon: FiCalendar },
+  { to: "/teacher/grades", label: "Grades", icon: FiAward },
+  { to: "/teacher/reports", label: "Reports", icon: FiFileText },
+];
 
 export default function TeacherLayout({ children, title }) {
   const [user, setUser] = useState(null);
@@ -67,8 +79,13 @@ export default function TeacherLayout({ children, title }) {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate("/");
+    } catch (error) {
+      toast.error("You were not signed out: " + (error.message || "unknown error"));
+    }
   };
 
   const toggleMobileMenu = () => {
@@ -76,78 +93,25 @@ export default function TeacherLayout({ children, title }) {
   };
 
   if (!user) {
-    return null; // or a loading spinner
+    return <LoadingScreen label="Loading session" />;
   }
 
-  // Helper function to handle navigation
-  const handleNavigation = (path) => {
-    navigate(path);
-  };
-
   return (
-    <div className="flex h-screen bg-red-50">
-      {/* Sidebar for desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-red-800 text-white border-r">
-        <div className="p-4 border-b border-red-700">
-          <h2 className="text-xl font-bold">Teacher Portal</h2>
-          <p className="text-sm text-red-200">
-            Welcome, {user?.username || "Teacher"}
-          </p>
-        </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <button
-            onClick={() => handleNavigation("/teacher/dashboard")}
-            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
-          >
-            <FiHome className="mr-3" />
-            <span>Dashboard</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/teacher/subjects")}
-            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
-          >
-            <FiBook className="mr-3" />
-            <span>Subjects</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/teacher/students")}
-            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
-          >
-            <FiUsers className="mr-3" />
-            <span>Students</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/teacher/attendance")}
-            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
-          >
-            <FiCalendar className="mr-3" />
-            <span>Attendance</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/teacher/grades")}
-            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
-          >
-            <FiAward className="mr-3" />
-            <span>Grades</span>
-          </button>
-          <button
-            onClick={() => handleNavigation("/teacher/reports")}
-            className="w-full flex items-center p-2 rounded-lg hover:bg-red-700 transition-colors text-left"
-          >
-            <FiFileText className="mr-3" />
-            <span>Reports</span>
-          </button>
-        </nav>
-        <div className="p-4 border-t border-red-700">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center p-2 border border-gray-300 rounded-md hover:bg-red-700 transition-colors"
-          >
-            <FiLogOut className="mr-2" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </aside>
+    <div className="flex h-screen bg-gray-50">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-red-600 focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
+      <Sidebar
+        portal="Teacher"
+        username={user?.username || "Teacher"}
+        items={NAV_ITEMS}
+        mobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onLogout={handleLogout}
+      />
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -155,76 +119,32 @@ export default function TeacherLayout({ children, title }) {
         <header className="bg-white h-16 flex items-center justify-between px-4 shadow-sm">
           <div className="flex items-center">
             <button
-              className="md:hidden mr-2 text-red-600"
+              type="button"
+              className="mr-1 flex h-11 w-11 items-center justify-center rounded-lg text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 md:hidden"
               onClick={toggleMobileMenu}
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
             >
-              {isMobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
+              {isMobileMenuOpen ? <FiX size={24} aria-hidden="true" /> : <FiMenu size={24} aria-hidden="true" />}
             </button>
             <h1 className="text-xl font-bold text-gray-800">{title}</h1>
           </div>
           <div className="md:hidden">
             <button
+              type="button"
               onClick={handleLogout}
-              className="p-2 border border-red-600 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center"
+              className="flex min-h-11 items-center rounded-lg border border-red-600 px-3 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
             >
-              <FiLogOut className="mr-1" />
+              <FiLogOut className="mr-1" aria-hidden="true" />
               <span>Logout</span>
             </button>
           </div>
         </header>
 
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden bg-white shadow-sm">
-            <nav className="p-4 space-y-2">
-              <button
-                onClick={() => handleNavigation("/teacher/dashboard")}
-                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <FiHome className="mr-3" />
-                <span>Dashboard</span>
-              </button>
-              <button
-                onClick={() => handleNavigation("/teacher/subjects")}
-                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <FiBook className="mr-3" />
-                <span>Subjects</span>
-              </button>
-              <button
-                onClick={() => handleNavigation("/teacher/students")}
-                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <FiUsers className="mr-3" />
-                <span>Students</span>
-              </button>
-              <button
-                onClick={() => handleNavigation("/teacher/attendance")}
-                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <FiCalendar className="mr-3" />
-                <span>Attendance</span>
-              </button>
-              <button
-                onClick={() => handleNavigation("/teacher/grades")}
-                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <FiAward className="mr-3" />
-                <span>Grades</span>
-              </button>
-              <button
-                onClick={() => handleNavigation("/teacher/reports")}
-                className="w-full flex items-center p-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <FiFileText className="mr-3" />
-                <span>Reports</span>
-              </button>
-            </nav>
-          </div>
-        )}
-
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 focus:outline-none">
+          {children}
+        </main>
       </div>
     </div>
   );

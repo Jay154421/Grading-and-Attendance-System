@@ -1,162 +1,160 @@
-
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
-import { CalendarIcon, Save, Check, X, Clock, AlertCircle } from "lucide-react"
-import { format } from "date-fns"
+import { Save, Users, ClipboardList } from "lucide-react"
+import { format, parseISO } from "date-fns"
 import { supabase } from "../../lib/supabaseClient"
+import { toast } from "../ui/toastApi"
+import Button from "../ui/Button"
+import { SelectField, TextField } from "../ui/Field"
+import { LoadingState, EmptyState, ErrorState } from "../ui/States"
 
+const STATUS_OPTIONS = [
+  { value: "present", label: "Present" },
+  { value: "absent", label: "Absent" },
+  { value: "late", label: "Late" },
+  { value: "excused", label: "Excused" },
+]
 
 export default function AttendancePage() {
   const [subjects, setSubjects] = useState([])
   const [students, setStudents] = useState([])
   const [selectedSubject, setSelectedSubject] = useState("")
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [attendanceRecords, setAttendanceRecords] = useState([])
+  const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
   const [currentAttendance, setCurrentAttendance] = useState({})
   const [isSaving, setIsSaving] = useState(false)
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
 
-  // Status indicators configuration
-  const statusConfig = {
-    present: {
-      icon: <Check className="h-4 w-4 text-green-500" />,
-      color: "bg-green-100 text-green-800",
-      label: "Present"
-    },
-    absent: {
-      icon: <X className="h-4 w-4 text-red-500" />,
-      color: "bg-red-100 text-red-800",
-      label: "Absent"
-    },
-    late: {
-      icon: <Clock className="h-4 w-4 text-yellow-500" />,
-      color: "bg-yellow-100 text-yellow-800",
-      label: "Late"
-    },
-    excused: {
-      icon: <AlertCircle className="h-4 w-4 text-blue-500" />,
-      color: "bg-blue-100 text-blue-800",
-      label: "Excused"
+  const fetchData = async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [subjectsResult, studentsResult] = await Promise.all([
+        supabase.from("subjects").select("*"),
+        supabase.from("students").select("*"),
+      ])
+      if (subjectsResult.error) throw subjectsResult.error
+      if (studentsResult.error) throw studentsResult.error
+      setSubjects(subjectsResult.data ?? [])
+      setStudents(studentsResult.data ?? [])
+    } catch (error) {
+      setLoadError(error.message || "Attendance data could not be loaded.")
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      const { data: subjectsData } = await supabase.from('subjects').select('*')
-      const { data: studentsData } = await supabase.from('students').select('*')
-      const { data: attendanceData } = await supabase.from('attendance').select('*')
-
-      if (subjectsData) setSubjects(subjectsData)
-      if (studentsData) setStudents(studentsData)
-      if (attendanceData) setAttendanceRecords(attendanceData)
-      setLoading(false)
-    }
     fetchData()
   }, [])
 
   useEffect(() => {
-    if (selectedSubject && selectedDate) {
-      const dateString = format(selectedDate, "yyyy-MM-dd")
-      
-      const fetchAttendance = async () => {
-        const { data } = await supabase
-          .from('attendance')
-          .select('*')
-          .eq('subject_id', selectedSubject)
-          .eq('date', dateString)
+    if (!selectedSubject || !selectedDate) return
 
-        const existingRecords = data || []
+    let cancelled = false
 
-        // Filter students who are enrolled in this subject
-        const studentsInSubject = students.filter(student => 
-          student.subjects?.includes(selectedSubject))
+    const fetchAttendance = async () => {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("subject_id", selectedSubject)
+        .eq("date", selectedDate)
 
-        const attendanceMap = {}
-        existingRecords.forEach((record) => {
-          attendanceMap[record.student_id] = record.status
-        })
-
-        // Initialize attendance for students in subject if not already set
-        studentsInSubject.forEach(student => {
-          if (attendanceMap[student.id] === undefined) {
-            attendanceMap[student.id] = "absent"
-          }
-        })
-
-        setCurrentAttendance(attendanceMap)
+      if (cancelled) return
+      if (error) {
+        toast.error("Saved attendance for this date could not be loaded: " + error.message)
+        return
       }
 
-      fetchAttendance()
+      const saved = {}
+      ;(data || []).forEach((record) => {
+        saved[record.student_id] = record.status
+      })
+
+      // Nothing is marked until the teacher chooses it: an accidental save must
+      // never write "absent" for the whole class.
+      setCurrentAttendance(saved)
     }
-  }, [selectedSubject, selectedDate, attendanceRecords, students])
+
+    fetchAttendance()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSubject, selectedDate])
+
+  const studentsInSubject = students.filter((student) =>
+    selectedSubject ? student.subjects?.includes(selectedSubject) : false
+  )
+
+  const markedCount = studentsInSubject.filter(
+    (student) => currentAttendance[student.id]
+  ).length
 
   const handleAttendanceChange = (studentId, status) => {
-    setCurrentAttendance((prev) => ({
-      ...prev,
-      [studentId]: status,
-    }))
+    setCurrentAttendance((prev) => ({ ...prev, [studentId]: status }))
+  }
+
+  const markAllPresent = () => {
+    const next = {}
+    studentsInSubject.forEach((student) => {
+      next[student.id] = "present"
+    })
+    setCurrentAttendance(next)
+    toast.info(`Marked ${studentsInSubject.length} students present.`)
   }
 
   const saveAttendance = async () => {
     if (!selectedSubject || !selectedDate) return
 
-    setIsSaving(true)
-    const dateString = format(selectedDate, "yyyy-MM-dd")
+    const recordsToUpsert = studentsInSubject
+      .filter((student) => currentAttendance[student.id])
+      .map((student) => ({
+        date: selectedDate,
+        subject_id: selectedSubject,
+        student_id: student.id,
+        status: currentAttendance[student.id],
+      }))
 
-    // Prepare records to upsert
-    const recordsToUpsert = Object.entries(currentAttendance).map(([studentId, status]) => ({
-      date: dateString,
-      subject_id: selectedSubject,
-      student_id: studentId,
-      status: status
-    }))
-
-    const { error } = await supabase
-      .from('attendance')
-      .upsert(recordsToUpsert, { onConflict: ['date', 'subject_id', 'student_id'] })
-
-    if (!error) {
-      // Refetch attendance records
-      const { data } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('subject_id', selectedSubject)
-        .eq('date', dateString)
-
-      setAttendanceRecords(data || [])
+    if (recordsToUpsert.length === 0) {
+      toast.warning("Set a status for at least one student before saving.")
+      return
     }
 
+    setIsSaving(true)
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(recordsToUpsert, { onConflict: ["date", "subject_id", "student_id"] })
+
+    if (error) {
+      toast.error("Attendance was not saved: " + error.message)
+    } else {
+      toast.success(
+        `Attendance saved for ${recordsToUpsert.length} student${
+          recordsToUpsert.length === 1 ? "" : "s"
+        }.`
+      )
+    }
     setIsSaving(false)
   }
-
-  const handleDateSelect = (date) => {
-    setSelectedDate(date)
-    setIsCalendarOpen(false)
-  }
-
-  // Get students enrolled in the selected subject
-  const studentsInSubject = students.filter(student => 
-    selectedSubject ? student.subjects?.includes(selectedSubject) : false)
 
   return (
     <TeacherLayout title="Attendance">
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-4">Track Attendance</h2>
-        <div className="bg-white rounded-lg border border-red-100 shadow-sm">
-          <div className="p-4 border-b border-red-100">
-            <h3 className="text-lg font-bold">Select Subject and Date</h3>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold">Select Subject and Date</h3>
           </div>
           <div className="p-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="subject" className="block text-sm font-medium">
-                  Subject
-                </label>
-                <select
+            {loading ? (
+              <LoadingState label="Loading subjects" />
+            ) : loadError ? (
+              <ErrorState message={loadError} onRetry={fetchData} />
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
                   id="subject"
-                  className="w-full px-3 py-2 border border-red-200 rounded-md bg-white"
+                  label="Subject"
                   value={selectedSubject}
                   onChange={(e) => setSelectedSubject(e.target.value)}
                 >
@@ -166,118 +164,100 @@ export default function AttendancePage() {
                       {subject.code} - {subject.name}
                     </option>
                   ))}
-                </select>
+                </SelectField>
+                <TextField
+                  id="date"
+                  label="Date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                />
               </div>
-              <div className="space-y-2">
-                <label htmlFor="date" className="block text-sm font-medium">
-                  Date
-                </label>
-                <div className="relative">
-                  <button
-                    className="w-full flex items-center justify-start px-3 py-2 border border-red-200 rounded-md bg-white text-left"
-                    onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                    id="date"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-red-600" />
-                    {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                  </button>
-                  {isCalendarOpen && (
-                    <div className="absolute z-10 mt-1 bg-white border border-red-200 rounded-md shadow-lg p-2">
-                      <div className="grid grid-cols-7 gap-1">
-                        {Array.from({ length: 31 }, (_, i) => {
-                          const day = new Date()
-                          day.setDate(i + 1)
-                          return (
-                            <button
-                              key={i}
-                              className={`p-2 text-center rounded-md hover:bg-red-100 ${
-                                selectedDate && day.getDate() === selectedDate.getDate() ? "bg-red-200" : ""
-                              }`}
-                              onClick={() => handleDateSelect(day)}
-                            >
-                              {day.getDate()}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {selectedSubject && (
-        <div className="bg-white rounded-lg border border-red-100 shadow-sm">
-          <div className="p-4 border-b border-red-100">
-            <h3 className="text-lg font-bold">Attendance Sheet</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {format(selectedDate, "MMMM d, yyyy")} - {subjects.find(s => s.id === selectedSubject)?.name}
-              <span className="ml-2 text-red-600">
+      {selectedSubject && selectedDate && !loading && !loadError && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold">Attendance Sheet</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              {format(parseISO(selectedDate), "MMMM d, yyyy")} -{" "}
+              {subjects.find((s) => s.id === selectedSubject)?.name}
+              <span className="ml-2 font-medium text-red-700">
                 ({studentsInSubject.length} students)
               </span>
             </p>
           </div>
           <div className="p-4">
-            {loading ? (
-              <p className="text-center py-4 text-gray-500">Loading attendance data...</p>
-            ) : studentsInSubject.length === 0 ? (
-              <p className="text-center py-4 text-gray-500">
-                No students enrolled in this subject. Add students to the subject first.
-              </p>
+            {studentsInSubject.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No students are enrolled in this subject"
+                description="Open Students and add this subject to at least one student before taking attendance."
+              />
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-red-100">
-                        <th className="text-left p-2">Student</th>
-                        <th className="text-left p-2">ID</th>
-                        <th className="text-left p-2">Status</th>
-                        <th className="text-left p-2">Current Status</th>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Student
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Student ID
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Status
+                        </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-100">
                       {studentsInSubject.map((student) => {
-                        const status = currentAttendance[student.id] || "absent"
+                        const status = currentAttendance[student.id] || ""
                         return (
-                          <tr key={student.id} className="border-b border-red-100 hover:bg-red-50">
-                            <td className="p-2 flex items-center gap-2">
-                              <div className="h-8 w-8 rounded-full bg-red-100 overflow-hidden flex items-center justify-center">
-                                {student.photo ? (
-                                  <img
-                                    src={student.photo}
-                                    alt={student.full_name}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-red-600 font-medium">
-                                    {student.full_name?.split(' ').map(n => n[0]).join('')}
-                                  </span>
-                                )}
+                          <tr key={student.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center">
+                                  {student.photo ? (
+                                    <img src={student.photo} alt="" className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span className="text-xs font-medium text-gray-700">
+                                      {student.full_name
+                                        ?.split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .slice(0, 2)
+                                        .toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {student.full_name}
+                                </span>
                               </div>
-                              <span>{student.full_name}</span>
                             </td>
-                            <td className="p-2">{student.student_id}</td>
-                            <td className="p-2">
+                            <td className="px-4 py-3 text-sm text-gray-700">{student.student_id}</td>
+                            <td className="px-4 py-3">
+                              <label htmlFor={`status-${student.id}`} className="sr-only">
+                                Attendance status for {student.full_name}
+                              </label>
                               <select
-                                className="w-full px-3 py-2 border border-red-200 rounded-md bg-white"
+                                id={`status-${student.id}`}
+                                className="min-h-11 w-full max-w-[12rem] rounded-md border border-gray-500 bg-white px-3 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
                                 value={status}
                                 onChange={(e) => handleAttendanceChange(student.id, e.target.value)}
                               >
-                                <option value="present">Present</option>
-                                <option value="absent">Absent</option>
-                                <option value="late">Late</option>
-                                <option value="excused">Excused</option>
+                                <option value="">Not marked</option>
+                                {STATUS_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
                               </select>
-                            </td>
-                            <td className="p-2">
-                              <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${statusConfig[status].color}`}>
-                                {statusConfig[status].icon}
-                                <span className="text-sm">{statusConfig[status].label}</span>
-                              </div>
                             </td>
                           </tr>
                         )
@@ -285,38 +265,35 @@ export default function AttendancePage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-1 text-sm">
-                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                      <span>Present</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm">
-                      <div className="h-3 w-3 rounded-full bg-red-500"></div>
-                      <span>Absent</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm">
-                      <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
-                      <span>Late</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm">
-                      <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-                      <span>Excused</span>
-                    </div>
+
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-gray-600" aria-live="polite">
+                    {markedCount} of {studentsInSubject.length} marked
+                    {markedCount > 0 && markedCount < studentsInSubject.length
+                      ? ` (${studentsInSubject.length - markedCount} still unmarked)`
+                      : ""}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="secondary" onClick={markAllPresent}>
+                      Mark all present
+                    </Button>
+                    <Button onClick={saveAttendance} disabled={isSaving}>
+                      {isSaving ? "Saving..." : "Save Attendance"}
+                      <Save className="h-4 w-4" aria-hidden="true" />
+                    </Button>
                   </div>
-                  <button
-                    className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
-                    onClick={saveAttendance}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? "Saving..." : "Save Attendance"}
-                    <Save className="h-4 w-4" />
-                  </button>
                 </div>
               </>
             )}
           </div>
         </div>
+      )}
+
+      {selectedSubject && !studentsInSubject.length && !loading && !loadError && subjects.length > 0 && (
+        <p className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+          <ClipboardList className="h-4 w-4" aria-hidden="true" />
+          Choose a subject with enrolled students to open the attendance sheet.
+        </p>
       )}
     </TeacherLayout>
   )

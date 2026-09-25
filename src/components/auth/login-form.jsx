@@ -1,26 +1,8 @@
-import React, { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import toastr from "toastr";
-import "toastr/build/toastr.min.css";
-
-// Configure toastr
-toastr.options = {
-  closeButton: true,
-  debug: false,
-  newestOnTop: true,
-  progressBar: true,
-  positionClass: "toast-top-right",
-  preventDuplicates: false,
-  showDuration: "300",
-  hideDuration: "1000",
-  timeOut: "5000",
-  extendedTimeOut: "1000",
-  showEasing: "swing",
-  hideEasing: "linear",
-  showMethod: "fadeIn",
-  hideMethod: "fadeOut"
-};
+import { toast } from "../ui/toastApi";
+import Button from "../ui/Button";
+import { TextField } from "../ui/Field";
 
 export default function LoginForm() {
   const [activeTab, setActiveTab] = useState("login");
@@ -29,274 +11,222 @@ export default function LoginForm() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "teacher",
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const tabs = [
+    { id: "login", label: "Login" },
+    { id: "register", label: "Register (Teachers Only)" },
+  ];
 
+  const handleTabKeyDown = (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const index = tabs.findIndex((tab) => tab.id === activeTab);
+    const next =
+      event.key === "ArrowRight"
+        ? (index + 1) % tabs.length
+        : (index - 1 + tabs.length) % tabs.length;
+    setActiveTab(tabs[next].id);
+    document.getElementById(`tab-${tabs[next].id}`)?.focus();
+  };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setIsLoading(true);
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
+        email: loginData.email.trim(),
         password: loginData.password,
       });
-
       if (authError) throw authError;
 
-      // Get the full user data to check role
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (!user) throw new Error("User data not available");
 
-      if (!user) {
-        throw new Error("User data not available");
-      }
-
-      // Redirect based on role
       const role = user.user_metadata?.role || "teacher";
       window.location.href =
         role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
     } catch (err) {
-      toastr.error(err.message || "Invalid email or password");
-      console.error("Login error:", err);
+      toast.error(err.message || "Invalid email or password");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const handleRegister = async (event) => {
+    event.preventDefault();
     setIsLoading(true);
 
     if (registerData.password !== registerData.confirmPassword) {
-      toastr.error("Passwords do not match");
+      toast.error("Passwords do not match");
       setIsLoading(false);
       return;
     }
 
     try {
       const { data, error } = await supabase.auth.signUp({
-        email: registerData.email,
+        email: registerData.email.trim(),
         password: registerData.password,
-        options: {
-          data: {
-            role: registerData.role,
-          },
-        },
+        options: { data: { role: "teacher" } },
       });
-
       if (error) throw error;
 
-      // Auto-confirm the user (only works if email confirmations are disabled in Supabase settings)
       if (data.user) {
         await supabase.auth.signInWithPassword({
-          email: registerData.email,
+          email: registerData.email.trim(),
           password: registerData.password,
         });
       }
 
-      toastr.success("Registration successful! You can now login.");
+      toast.success("Registration successful. You can now log in.");
       setActiveTab("login");
       setLoginData({ email: registerData.email, password: "" });
     } catch (err) {
-      toastr.error(err.message || "Registration failed. Please try again.");
-      console.error("Registration error:", err);
+      toast.error(err.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-red-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-red-100">
-          <div className="flex">
-            <button
-              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "login"
-                  ? "border-red-600 text-red-700"
-                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
-              }`}
-              onClick={() => setActiveTab("login")}
-            >
-              Login
-            </button>
-            <button
-              className={`flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "register"
-                  ? "border-red-600 text-red-700"
-                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
-              }`}
-              onClick={() => setActiveTab("register")}
-            >
-              Register (Teachers Only)
-            </button>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+          <div className="flex" role="tablist" aria-label="Account access">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                id={`tab-${tab.id}`}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`panel-${tab.id}`}
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                onKeyDown={handleTabKeyDown}
+                className={`flex-1 min-h-11 px-2 text-center text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500 ${
+                  activeTab === tab.id
+                    ? "border-red-600 text-red-700"
+                    : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                }`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <div className="p-8">
-            {activeTab === "login" ? (
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div className="text-center">
-                  <h2 className="text-2xl font-bold text-gray-900">Login</h2>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Enter your credentials to access your account
-                  </p>
-                </div>
+            <form
+              id="panel-login"
+              role="tabpanel"
+              aria-labelledby="tab-login"
+              hidden={activeTab !== "login"}
+              onSubmit={handleLogin}
+              className="space-y-6"
+            >
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-gray-900">Login</h1>
+                <p className="mt-2 text-sm text-gray-600">
+                  Enter your credentials to access your account
+                </p>
+              </div>
+              <TextField
+                id="email"
+                label="Email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="Enter your email"
+                value={loginData.email}
+                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+              />
+              <TextField
+                id="password"
+                label="Password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                value={loginData.password}
+                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+              />
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Email
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={loginData.email}
-                    onChange={(e) =>
-                      setLoginData({ ...loginData, email: e.target.value })
-                    }
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Password
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={loginData.password}
-                    onChange={(e) =>
-                      setLoginData({ ...loginData, password: e.target.value })
-                    }
-                    placeholder="Enter your password"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Login"}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleRegister} className="space-y-6">
-                <div className="text-center">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Teacher Registration
-                  </h2>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Create a new teacher account
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="reg-email"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Email
-                  </label>
-                  <input
-                    id="reg-email"
-                    type="email"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={registerData.email}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        email: e.target.value,
-                      })
-                    }
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="reg-password"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Password
-                  </label>
-                  <input
-                    id="reg-password"
-                    type="password"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={registerData.password}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        password: e.target.value,
-                      })
-                    }
-                    placeholder="Create a password"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="reg-confirm-password"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Confirm Password
-                  </label>
-                  <input
-                    id="reg-confirm-password"
-                    type="password"
-                    required
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-                    value={registerData.confirmPassword}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        confirmPassword: e.target.value,
-                      })
-                    }
-                    placeholder="Confirm your password"
-                  />
-                </div>
-
-                <input
-                  type="hidden"
-                  value="teacher"
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, role: e.target.value })
-                  }
-                />
-
-                <div className="text-xs text-gray-500 mt-4">
-                  <p>
-                    Note: Student registration is only available through the
-                    teacher portal after login.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Registering..." : "Register Teacher Account"}
-                </button>
-              </form>
-            )}
+            <form
+              id="panel-register"
+              role="tabpanel"
+              aria-labelledby="tab-register"
+              hidden={activeTab !== "register"}
+              onSubmit={handleRegister}
+              className="space-y-6"
+            >
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Teacher Registration
+                </h1>
+                <p className="mt-2 text-sm text-gray-600">
+                  Create a new teacher account
+                </p>
+              </div>
+              <TextField
+                id="reg-email"
+                label="Email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="Enter your email"
+                value={registerData.email}
+                onChange={(e) =>
+                  setRegisterData({ ...registerData, email: e.target.value })
+                }
+              />
+              <TextField
+                id="reg-password"
+                label="Password"
+                type="password"
+                required
+                autoComplete="new-password"
+                placeholder="Create a password"
+                value={registerData.password}
+                onChange={(e) =>
+                  setRegisterData({ ...registerData, password: e.target.value })
+                }
+              />
+              <TextField
+                id="reg-confirm-password"
+                label="Confirm Password"
+                type="password"
+                required
+                autoComplete="new-password"
+                placeholder="Confirm your password"
+                error={
+                  registerData.confirmPassword &&
+                  registerData.password !== registerData.confirmPassword
+                    ? "Passwords do not match"
+                    : undefined
+                }
+                value={registerData.confirmPassword}
+                onChange={(e) =>
+                  setRegisterData({
+                    ...registerData,
+                    confirmPassword: e.target.value,
+                  })
+                }
+              />
+              <p className="text-xs text-gray-600">
+                Note: Student registration is only available through the teacher portal
+                after login.
+              </p>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Registering..." : "Register Teacher Account"}
+              </Button>
+            </form>
           </div>
         </div>
       </div>

@@ -1,10 +1,25 @@
-
 import { useState, useEffect } from "react"
 import TeacherLayout from "../layout/teacher-layout"
-import { Plus, Pencil, Trash, Loader2, BookOpen } from "lucide-react"
+import { Plus, Pencil, Trash, BookOpen } from "lucide-react"
 import { supabase } from "../../lib/supabaseClient"
-import toastr from 'toastr'
-import 'toastr/build/toastr.min.css'
+import { toast } from "../ui/toastApi"
+import Modal from "../ui/Modal"
+import Button from "../ui/Button"
+import { TextField, SelectField } from "../ui/Field"
+import { LoadingState, EmptyState, ErrorState } from "../ui/States"
+
+const EMPTY_FORM = {
+  code: "",
+  name: "",
+  semester: "1st",
+  school_year: "",
+}
+
+const SEMESTERS = [
+  { value: "1st", label: "1st Semester" },
+  { value: "2nd", label: "2nd Semester" },
+  { value: "Summer", label: "Summer" },
+]
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState([])
@@ -12,83 +27,76 @@ export default function SubjectsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [currentSubject, setCurrentSubject] = useState(null)
-  const [formData, setFormData] = useState({
-    code: "",
-    name: "",
-    semester: "1st",
-    school_year: "",
-  })
+  const [formData, setFormData] = useState(EMPTY_FORM)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [processing, setProcessing] = useState(false)
 
-  // Configure toastr
-  toastr.options = {
-    positionClass: 'toast-top-right',
-    preventDuplicates: true,
-    progressBar: true,
-    timeOut: 3000
-  };
+  const fetchSubjects = async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const { data, error } = await supabase
+        .from("subjects")
+        .select("*")
+        .order("created_at", { ascending: false })
+      if (error) throw error
+      setSubjects(data ?? [])
+    } catch (error) {
+      setLoadError(error.message || "Subjects could not be loaded.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchSubjects = async () => {
-      setLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('subjects')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setSubjects(data)
-      } catch (error) {
-        toastr.error("Failed to fetch subjects: " + error.message)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchSubjects()
   }, [])
 
+  // Checked before the insert, so a duplicate never writes a row it then hides.
+  const findDuplicate = ({ code, name }, ignoreId) =>
+    subjects.find(
+      (subject) =>
+        subject.id !== ignoreId &&
+        (subject.code.trim().toLowerCase() === code.trim().toLowerCase() ||
+          subject.name.trim().toLowerCase() === name.trim().toLowerCase())
+    )
+
   const handleAddSubject = async () => {
-    if (!formData.code || !formData.name) {
-      toastr.warning("Please fill in all required fields")
+    const code = formData.code.trim()
+    const name = formData.name.trim()
+
+    if (!code || !name) {
+      toast.warning("Subject code and name are required.")
+      return
+    }
+
+    const duplicate = findDuplicate({ code, name }, null)
+    if (duplicate) {
+      toast.warning(
+        duplicate.code.toLowerCase() === code.toLowerCase()
+          ? `Subject code ${duplicate.code} is already used by ${duplicate.name}.`
+          : `"${duplicate.name}" already exists as ${duplicate.code}.`
+      )
       return
     }
 
     setProcessing(true)
     try {
       const { data, error } = await supabase
-        .from('subjects')
-        .insert([formData])
+        .from("subjects")
+        .insert([{ ...formData, code, name }])
         .select()
 
       if (error) throw error
-
-      
-      const isDuplicate = subjects.some(
-      subject => subject.name.toLowerCase() === formData.name.toLowerCase()
-    );
-
-      const isDuplicateCode = subjects.some(
-      subject => subject.code.toLowerCase() === formData.code.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      toastr.warning("A subject with this name already exists")
-      return
-    }
-
-       if (isDuplicateCode) {
-      toastr.warning("A subject with this Subject Code already exists")
-      return
-    }
+      if (!data?.[0]) throw new Error("the insert returned no row")
 
       setSubjects([data[0], ...subjects])
       setIsAddDialogOpen(false)
       resetForm()
-      toastr.success("Subject added successfully")
+      toast.success(`${name} added.`)
     } catch (error) {
-      toastr.error("Error adding subject: " + error.message)
+      toast.error("Subject was not added: " + error.message)
     } finally {
       setProcessing(false)
     }
@@ -97,24 +105,42 @@ export default function SubjectsPage() {
   const handleEditSubject = async () => {
     if (!currentSubject) return
 
+    const code = formData.code.trim()
+    const name = formData.name.trim()
+    if (!code || !name) {
+      toast.warning("Subject code and name are required.")
+      return
+    }
+
+    const duplicate = findDuplicate({ code, name }, currentSubject.id)
+    if (duplicate) {
+      toast.warning(
+        duplicate.code.toLowerCase() === code.toLowerCase()
+          ? `Subject code ${duplicate.code} is already used by ${duplicate.name}.`
+          : `"${duplicate.name}" already exists as ${duplicate.code}.`
+      )
+      return
+    }
+
     setProcessing(true)
     try {
       const { error } = await supabase
-        .from('subjects')
-        .update(formData)
-        .eq('id', currentSubject.id)
+        .from("subjects")
+        .update({ ...formData, code, name })
+        .eq("id", currentSubject.id)
 
       if (error) throw error
 
-      const updatedSubjects = subjects.map((subject) =>
-        subject.id === currentSubject.id ? { ...subject, ...formData } : subject
+      setSubjects(
+        subjects.map((subject) =>
+          subject.id === currentSubject.id ? { ...subject, ...formData, code, name } : subject
+        )
       )
-      setSubjects(updatedSubjects)
       setIsEditDialogOpen(false)
       resetForm()
-      toastr.success("Subject updated successfully")
+      toast.success(`${name} updated.`)
     } catch (error) {
-      toastr.error("Error updating subject: " + error.message)
+      toast.error("Subject was not updated: " + error.message)
     } finally {
       setProcessing(false)
     }
@@ -125,19 +151,16 @@ export default function SubjectsPage() {
 
     setProcessing(true)
     try {
-      const { error } = await supabase
-        .from('subjects')
-        .delete()
-        .eq('id', currentSubject.id)
+      const { error } = await supabase.from("subjects").delete().eq("id", currentSubject.id)
 
       if (error) throw error
 
-      const updatedSubjects = subjects.filter((subject) => subject.id !== currentSubject.id)
-      setSubjects(updatedSubjects)
+      setSubjects(subjects.filter((subject) => subject.id !== currentSubject.id))
       setIsDeleteDialogOpen(false)
-      toastr.success("Subject deleted successfully")
+      toast.success(`${currentSubject.name} deleted.`)
+      resetForm()
     } catch (error) {
-      toastr.error("Error deleting subject: " + error.message)
+      toast.error("Subject was not deleted: " + error.message)
     } finally {
       setProcessing(false)
     }
@@ -149,7 +172,7 @@ export default function SubjectsPage() {
       code: subject.code,
       name: subject.name,
       semester: subject.semester,
-      school_year: subject.school_year,
+      school_year: subject.school_year || "",
     })
     setIsEditDialogOpen(true)
   }
@@ -159,75 +182,110 @@ export default function SubjectsPage() {
     setIsDeleteDialogOpen(true)
   }
 
+  const closeDialogs = () => {
+    setIsAddDialogOpen(false)
+    setIsEditDialogOpen(false)
+    setIsDeleteDialogOpen(false)
+    resetForm()
+  }
+
   const resetForm = () => {
-    setFormData({
-      code: "",
-      name: "",
-      semester: "1st",
-      school_year: "",
-    })
+    setFormData(EMPTY_FORM)
     setCurrentSubject(null)
   }
+
+  const subjectFields = (prefix) => (
+    <div className="grid gap-4">
+      <TextField
+        id={`${prefix}code`}
+        label="Subject Code"
+        required
+        placeholder="e.g., CS101"
+        value={formData.code}
+        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+      />
+      <TextField
+        id={`${prefix}name`}
+        label="Subject Name"
+        required
+        placeholder="e.g., Introduction to Computer Science"
+        value={formData.name}
+        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+      />
+      <SelectField
+        id={`${prefix}semester`}
+        label="Semester"
+        value={formData.semester}
+        onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+      >
+        {SEMESTERS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
+      <TextField
+        id={`${prefix}school_year`}
+        label="School Year"
+        placeholder="e.g., 2026-2027"
+        value={formData.school_year}
+        onChange={(e) => setFormData({ ...formData, school_year: e.target.value })}
+      />
+    </div>
+  )
 
   return (
     <TeacherLayout title="Subjects">
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Subject Management</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-2xl font-bold text-gray-900">Subject Management</h2>
+            <p className="text-sm text-gray-600 mt-1">
               Manage all subjects in the system
             </p>
           </div>
-          <button
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            onClick={() => setIsAddDialogOpen(true)}
-          >
-            <Plus className="-ml-1 mr-2 h-5 w-5" />
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-5 w-5" aria-hidden="true" />
             Add Subject
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-lg font-medium text-gray-900">Subject List</h2>
+            <h3 className="text-lg font-medium text-gray-900">Subject List</h3>
           </div>
           <div className="p-6">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 text-gray-400 animate-spin" />
-                <p className="mt-2 text-sm text-gray-500">Loading subjects...</p>
-              </div>
+              <LoadingState label="Loading subjects" />
+            ) : loadError ? (
+              <ErrorState message={loadError} onRetry={fetchSubjects} />
             ) : subjects.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="mx-auto h-10 w-10 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No subjects found</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Get started by adding a new subject.
-                </p>
-                <button
-                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none"
-                  onClick={() => setIsAddDialogOpen(true)}
-                >
-                  <Plus className="-ml-1 mr-2 h-5 w-5" />
-                  Add Subject
-                </button>
-              </div>
+              <EmptyState
+                icon={BookOpen}
+                title="No subjects found"
+                description="Get started by adding a new subject."
+                action={
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="h-5 w-5" aria-hidden="true" />
+                    Add Subject
+                  </Button>
+                }
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                         Code
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                         Name
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                         Semester
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                         School Year
                       </th>
                       <th scope="col" className="relative px-6 py-3">
@@ -241,30 +299,34 @@ export default function SubjectsPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {subject.code}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {subject.name}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {subject.semester}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {subject.school_year || '-'}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {subject.school_year || "-"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end">
                             <button
+                              type="button"
                               onClick={() => openEditDialog(subject)}
-                              className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-gray-100"
-                              title="Edit"
+                              aria-label={`Edit ${subject.name}`}
+                              title={`Edit ${subject.name}`}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => openDeleteDialog(subject)}
-                              className="text-gray-500 hover:text-gray-900 p-1 rounded-md hover:bg-gray-100"
-                              title="Delete"
+                              aria-label={`Delete ${subject.name}`}
+                              title={`Delete ${subject.name}`}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                             >
-                              <Trash className="h-4 w-4" />
+                              <Trash className="h-4 w-4" aria-hidden="true" />
                             </button>
                           </div>
                         </td>
@@ -278,225 +340,70 @@ export default function SubjectsPage() {
         </div>
       </div>
 
-      {/* Add Subject Modal */}
-      {isAddDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-lg font-medium text-gray-900">Add New Subject</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid gap-4">
-                <div>
-                  <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="code"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="e.g., CS101"
-                  />
-                </div>
+      <Modal
+        open={isAddDialogOpen}
+        onClose={closeDialogs}
+        title="Add New Subject"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDialogs} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSubject}
+              disabled={!formData.code.trim() || !formData.name.trim() || processing}
+            >
+              {processing ? "Adding..." : "Add Subject"}
+            </Button>
+          </>
+        }
+      >
+        {subjectFields("")}
+      </Modal>
 
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Introduction to Computer Science"
-                  />
-                </div>
+      <Modal
+        open={isEditDialogOpen}
+        onClose={closeDialogs}
+        title="Edit Subject"
+        description={currentSubject ? `Editing ${currentSubject.name}` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDialogs} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSubject}
+              disabled={!formData.code.trim() || !formData.name.trim() || processing}
+            >
+              {processing ? "Saving..." : "Save Changes"}
+            </Button>
+          </>
+        }
+      >
+        {subjectFields("edit-")}
+      </Modal>
 
-                <div>
-                  <label htmlFor="semester" className="block text-sm font-medium text-gray-700 mb-1">
-                    Semester
-                  </label>
-                  <select
-                    id="semester"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 bg-white"
-                    value={formData.semester}
-                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                  >
-                    <option value="1st">1st Semester</option>
-                    <option value="2nd">2nd Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="school_year" className="block text-sm font-medium text-gray-700 mb-1">
-                    School Year
-                  </label>
-                  <input
-                    id="school_year"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    value={formData.school_year}
-                    onChange={(e) => setFormData({ ...formData, school_year: e.target.value })}
-                    placeholder="e.g., 2023-2024"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
-              <button
-                type="button"
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                onClick={() => setIsAddDialogOpen(false)}
-                disabled={processing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-                onClick={handleAddSubject}
-                disabled={!formData.code || !formData.name || processing}
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 inline" />
-                    Adding...
-                  </>
-                ) : 'Add Subject'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Subject Modal */}
-      {isEditDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-lg font-medium text-gray-900">Edit Subject</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid gap-4">
-                <div>
-                  <label htmlFor="edit-code" className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="edit-code"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="edit-name" className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="edit-name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="edit-semester" className="block text-sm font-medium text-gray-700 mb-1">
-                    Semester
-                  </label>
-                  <select
-                    id="edit-semester"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 bg-white"
-                    value={formData.semester}
-                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                  >
-                    <option value="1st">1st Semester</option>
-                    <option value="2nd">2nd Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="edit-school_year" className="block text-sm font-medium text-gray-700 mb-1">
-                    School Year
-                  </label>
-                  <input
-                    id="edit-school_year"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                    value={formData.school_year}
-                    onChange={(e) => setFormData({ ...formData, school_year: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
-              <button
-                type="button"
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                onClick={() => setIsEditDialogOpen(false)}
-                disabled={processing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-                onClick={handleEditSubject}
-                disabled={!formData.code || !formData.name || processing}
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 inline" />
-                    Saving...
-                  </>
-                ) : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {isDeleteDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-lg font-medium text-gray-900">Delete Subject</h3>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600">
-                Are you sure you want to delete <span className="font-medium">{currentSubject?.name}</span>? This action cannot be undone.
-              </p>
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  onClick={() => setIsDeleteDialogOpen(false)}
-                  disabled={processing}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-                  onClick={handleDeleteSubject}
-                  disabled={processing}
-                >
-                  {processing ? (
-                    <>
-                      <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 inline" />
-                      Deleting...
-                    </>
-                  ) : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={isDeleteDialogOpen}
+        onClose={closeDialogs}
+        title="Delete Subject"
+        description={`Delete ${currentSubject?.code} - ${currentSubject?.name}?`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDialogs} disabled={processing}>
+              Cancel
+            </Button>
+            <Button onClick={handleDeleteSubject} disabled={processing}>
+              {processing ? "Deleting..." : "Delete"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700">
+          This cannot be undone. Students keep their records, but this subject disappears
+          from their enrolled list.
+        </p>
+      </Modal>
     </TeacherLayout>
   )
 }

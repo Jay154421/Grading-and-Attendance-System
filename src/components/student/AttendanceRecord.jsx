@@ -1,199 +1,218 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import StudentLayout from "../layout/student-layout";
-import { Check, X, Clock, AlertCircle } from "lucide-react";
+import { Check, X, Clock, AlertCircle, ClipboardList } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import { SelectField } from "../ui/Field";
+import { LoadingState, EmptyState, ErrorState } from "../ui/States";
+
+const STATUS_CONFIG = {
+  present: {
+    icon: Check,
+    chip: "bg-green-100 text-green-800",
+    iconColor: "text-green-700",
+    label: "Present",
+  },
+  absent: {
+    icon: X,
+    chip: "bg-red-100 text-red-800",
+    iconColor: "text-red-700",
+    label: "Absent",
+  },
+  late: {
+    icon: Clock,
+    chip: "bg-yellow-100 text-yellow-800",
+    iconColor: "text-yellow-700",
+    label: "Late",
+  },
+  excused: {
+    icon: AlertCircle,
+    chip: "bg-blue-100 text-blue-800",
+    iconColor: "text-blue-700",
+    label: "Excused",
+  },
+};
+
+const UNKNOWN_STATUS = {
+  icon: AlertCircle,
+  chip: "bg-gray-100 text-gray-700",
+  iconColor: "text-gray-600",
+  label: "Not recorded",
+};
 
 export default function StudentAttendancePage() {
   const [subjects, setSubjects] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState("");
-  const [currentUser, setCurrentUser] = useState(null);
   const [filteredAttendance, setFilteredAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [enrolledSubjects, setEnrolledSubjects] = useState([]);
+  const navigate = useNavigate();
 
-  // Status indicators configuration - matching AttendancePage.jsx
-  const statusConfig = {
-    present: {
-      icon: <Check className="h-4 w-4 text-green-500" />,
-      color: "bg-green-100 text-green-800",
-      label: "Present"
-    },
-    absent: {
-      icon: <X className="h-4 w-4 text-red-500" />,
-      color: "bg-red-100 text-red-800",
-      label: "Absent"
-    },
-    late: {
-      icon: <Clock className="h-4 w-4 text-yellow-500" />,
-      color: "bg-yellow-100 text-yellow-800",
-      label: "Late"
-    },
-    excused: {
-      icon: <AlertCircle className="h-4 w-4 text-blue-500" />,
-      color: "bg-blue-100 text-blue-800",
-      label: "Excused"
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        navigate("/", { replace: true });
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        navigate("/", { replace: true });
+        return;
+      }
+
+      const { data: studentData, error: studentError } = await supabase
+        .from("students")
+        .select("*")
+        .eq("email", user.email)
+        .single();
+
+      if (studentError) throw studentError;
+      if (!studentData) throw new Error("No student record found for this account.");
+
+      let enrolledSubjectIds = [];
+      if (studentData.subjects) {
+        try {
+          enrolledSubjectIds = Array.isArray(studentData.subjects)
+            ? studentData.subjects
+            : JSON.parse(studentData.subjects);
+        } catch {
+          enrolledSubjectIds = [];
+        }
+      }
+
+      const { data: subjectsData, error: subjectsError } = await supabase
+        .from("subjects")
+        .select("*")
+        .in("id", enrolledSubjectIds);
+
+      if (subjectsError) throw subjectsError;
+      setSubjects(subjectsData || []);
+      setEnrolledSubjects(subjectsData || []);
+
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("student_id", studentData.id)
+        .in("subject_id", enrolledSubjectIds);
+
+      if (attendanceError) throw attendanceError;
+      setAttendanceRecords(attendanceData || []);
+    } catch (error) {
+      setLoadError(error.message || "Your attendance records could not be loaded.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Mount-only fetch: the retry button calls this same function.
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-          window.location.href = "/";
-          return;
-        }
-
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          window.location.href = "/";
-          return;
-        }
-
-        const { data: studentData, error: studentError } = await supabase
-          .from("students")
-          .select("*")
-          .eq("email", user.email)
-          .single();
-
-        if (studentError) throw studentError;
-        if (!studentData) {
-          console.error("No student data found");
-          return;
-        }
-
-        setCurrentUser(studentData);
-
-        let enrolledSubjectIds = [];
-        if (studentData?.subjects) {
-          try {
-            enrolledSubjectIds = Array.isArray(studentData.subjects) 
-              ? studentData.subjects 
-              : JSON.parse(studentData.subjects);
-          } catch (error) {
-            console.error("Error parsing subjects:", error);
-            enrolledSubjectIds = [];
-          }
-        }
-
-        const { data: subjectsData } = await supabase
-          .from("subjects")
-          .select("*")
-          .in("id", enrolledSubjectIds);
-
-        setSubjects(subjectsData || []);
-        setEnrolledSubjects(subjectsData || []);
-
-        const { data: attendanceData } = await supabase
-          .from("attendance")
-          .select("*")
-          .eq("student_id", studentData.id)
-          .in("subject_id", enrolledSubjectIds);
-
-        setAttendanceRecords(attendanceData || []);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (currentUser && selectedSubject) {
-      const filtered = attendanceRecords.filter(
-        (record) => record.subject_id === selectedSubject
-      );
-      filtered.sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-      setFilteredAttendance(filtered);
-    } else if (currentUser) {
-      setFilteredAttendance(attendanceRecords);
-    }
-  }, [currentUser, selectedSubject, attendanceRecords]);
+    const filtered = selectedSubject
+      ? attendanceRecords.filter((record) => record.subject_id === selectedSubject)
+      : attendanceRecords;
 
-  // Updated status badge to match AttendancePage.jsx style
-  const getStatusBadge = (status) => {
-    const config = statusConfig[status] || statusConfig.absent;
+    setFilteredAttendance(
+      [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    );
+  }, [selectedSubject, attendanceRecords]);
+
+  const StatusBadge = ({ status }) => {
+    const config = STATUS_CONFIG[status] || UNKNOWN_STATUS;
+    const Glyph = config.icon;
     return (
-      <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${config.color}`}>
-        {config.icon}
-        <span className="text-sm">{config.label}</span>
-      </div>
+      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${config.chip}`}>
+        <Glyph className={`h-4 w-4 ${config.iconColor}`} aria-hidden="true" />
+        {config.label}
+      </span>
     );
   };
 
   return (
     <StudentLayout title="Attendance">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">My Attendance</h2>
-        <div className="border border-red-100 rounded-lg overflow-hidden shadow-sm">
-          <div className="p-4 border-b border-red-100 bg-red-50">
-            <h3 className="text-lg font-semibold text-red-800">Filter by Subject</h3>
+        <h2 className="text-2xl font-bold mb-4 text-gray-900">My Attendance</h2>
+        <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900">Filter by Subject</h3>
           </div>
           <div className="p-4 bg-white">
-            <div className="space-y-2">
-              <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
-                Subject
-              </label>
-              <select
-                id="subject"
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
-              >
-                <option value="">All subjects</option>
-                {enrolledSubjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.code} - {subject.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              id="subject"
+              label="Subject"
+              hint="Leave as All subjects to see your full history."
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+            >
+              <option value="">All subjects</option>
+              {enrolledSubjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.code} - {subject.name}
+                </option>
+              ))}
+            </SelectField>
           </div>
         </div>
       </div>
 
-      <div className="border border-red-100 rounded-lg overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-red-100 bg-red-50">
-          <h3 className="text-lg font-semibold text-red-800">Attendance Records</h3>
-          {/* Added status legend like in AttendancePage.jsx */}
-          <div className="flex flex-wrap gap-4 mt-2">
-            {Object.entries(statusConfig).map(([status, config]) => (
-              <div key={status} className="flex items-center gap-1 text-sm">
-                <div className={`h-3 w-3 rounded-full ${status === 'present' ? 'bg-green-500' : 
-                                 status === 'absent' ? 'bg-red-500' : 
-                                 status === 'late' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
-                <span>{config.label}</span>
-              </div>
-            ))}
-          </div>
+      <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <h3 className="text-lg font-semibold text-gray-900">Attendance Records</h3>
+          <p className="mt-1 text-sm text-gray-600" aria-live="polite">
+            {loading
+              ? "Loading records"
+              : `${filteredAttendance.length} record${filteredAttendance.length === 1 ? "" : "s"}${
+                  selectedSubject ? " in this subject" : ""
+                }`}
+          </p>
         </div>
         <div className="p-4 bg-white">
           {loading ? (
-            <p className="text-center py-4 text-gray-500">Loading attendance data...</p>
+            <LoadingState label="Loading attendance data" />
+          ) : loadError ? (
+            <ErrorState message={loadError} onRetry={fetchData} />
           ) : filteredAttendance.length === 0 ? (
-            <p className="text-center py-4 text-gray-500">No attendance records found.</p>
+            <EmptyState
+              icon={ClipboardList}
+              title="No attendance records yet"
+              description="Nothing has been recorded for this subject yet. Check back after your next class."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-red-600 text-white">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Subject</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Subject
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredAttendance.map((record) => {
                     const subject = subjects.find((s) => s.id === record.subject_id);
                     return (
-                      <tr key={record.id} className="hover:bg-red-50">
+                      <tr key={record.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {new Date(record.date).toLocaleDateString()}
                         </td>
@@ -201,7 +220,7 @@ export default function StudentAttendancePage() {
                           {subject ? `${subject.code} - ${subject.name}` : "Unknown"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {getStatusBadge(record.status)}
+                          <StatusBadge status={record.status} />
                         </td>
                       </tr>
                     );
