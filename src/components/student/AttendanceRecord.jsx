@@ -148,7 +148,7 @@ export default function StudentAttendancePage() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-4 text-gray-900">My Attendance</h2>
         <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="p-4 border-b border-gray-200 bg-canvas">
             <h3 className="text-lg font-semibold text-gray-900">Filter by Subject</h3>
           </div>
           <div className="p-4 bg-white">
@@ -171,7 +171,7 @@ export default function StudentAttendancePage() {
       </div>
 
       <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="p-4 border-b border-gray-200 bg-canvas">
           <h3 className="text-lg font-semibold text-gray-900">Attendance Records</h3>
           <p className="mt-1 text-sm text-gray-600" aria-live="polite">
             {loading
@@ -195,7 +195,7 @@ export default function StudentAttendancePage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-canvas">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                       Date
@@ -212,7 +212,7 @@ export default function StudentAttendancePage() {
                   {filteredAttendance.map((record) => {
                     const subject = subjects.find((s) => s.id === record.subject_id);
                     return (
-                      <tr key={record.id} className="hover:bg-gray-50">
+                      <tr key={record.id} className="hover:bg-canvas">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {new Date(record.date).toLocaleDateString()}
                         </td>

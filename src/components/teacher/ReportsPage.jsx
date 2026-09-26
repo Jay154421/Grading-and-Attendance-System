@@ -9,7 +9,8 @@ import Button from "../ui/Button"
 import { SelectField } from "../ui/Field"
 import { LoadingState, ErrorState } from "../ui/States"
 
-const ACCENT = [220, 38, 38] // #dc2626 - 4.83:1 with white, the only accent in DESIGN.md
+const REPORT_PRIMARY = [67, 56, 202]
+const REPORT_ROW = [238, 242, 255]
 
 export default function ReportsPage() {
   const [subjects, setSubjects] = useState([])
@@ -210,8 +211,8 @@ export default function ReportsPage() {
       body: data,
       startY: 40,
       styles: { cellPadding: 3, fontSize: 10, valign: "middle" },
-      headStyles: { fillColor: ACCENT, textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [255, 245, 245] },
+      headStyles: { fillColor: REPORT_PRIMARY, textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: REPORT_ROW },
       columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: "auto" } },
       margin: { top: 40 },
     })
@@ -262,8 +263,8 @@ export default function ReportsPage() {
       body: data,
       startY: 50,
       styles: { cellPadding: 3, fontSize: 10, valign: "middle" },
-      headStyles: { fillColor: ACCENT, textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [255, 245, 245] },
+      headStyles: { fillColor: REPORT_PRIMARY, textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: REPORT_ROW },
       columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: "auto" } },
       margin: { top: 50 },
     })
@@ -344,7 +345,7 @@ export default function ReportsPage() {
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   className={`min-h-11 px-4 ${
                     activeTab === tab.id
-                      ? "border-b-2 border-red-600 font-medium text-gray-900"
+                      ? "border-b-2 border-brand font-medium text-gray-900"
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                   onClick={() => setActiveTab(tab.id)}
@@ -362,7 +363,7 @@ export default function ReportsPage() {
               id="report-panel-attendance"
               aria-labelledby="report-tab-attendance"
               tabIndex={0}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               <div className="p-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold">Attendance Reports</h3>
@@ -392,7 +393,7 @@ export default function ReportsPage() {
               id="report-panel-grades"
               aria-labelledby="report-tab-grades"
               tabIndex={0}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               <div className="p-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold">Grade Reports</h3>

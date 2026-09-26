@@ -180,10 +180,10 @@ export default function StudentGradesPage() {
     }
   };
 
-  const headerClass = "bg-gray-50";
+  const headerClass = "bg-canvas";
   const thClass =
     "p-3 text-left text-sm font-medium text-gray-600";
-  const rowClass = "border-b border-gray-100 hover:bg-gray-50";
+  const rowClass = "border-b border-gray-100 hover:bg-canvas";
 
   const subjectName = selectedSubject
     ? subjects.find((s) => s.id === selectedSubject)?.name
@@ -194,7 +194,7 @@ export default function StudentGradesPage() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-4 text-gray-900">My Grades</h2>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="p-4 border-b border-gray-200 bg-canvas">
             <h3 className="text-lg font-semibold text-gray-900">Filter by Subject</h3>
           </div>
           <div className="p-4">
@@ -239,7 +239,7 @@ export default function StudentGradesPage() {
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   className={`min-h-11 px-4 ${
                     activeTab === tab.id
-                      ? "border-b-2 border-red-600 font-medium text-gray-900"
+                      ? "border-b-2 border-brand font-medium text-gray-900"
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                   onClick={() => setActiveTab(tab.id)}
@@ -257,13 +257,13 @@ export default function StudentGradesPage() {
               id="student-panel-raw"
               aria-labelledby="student-tab-raw"
               tabIndex={0}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
-              <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <div className="p-4 border-b border-gray-200 bg-canvas">
                 <h3 className="text-lg font-semibold text-gray-900">Raw Grades</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {subjectName}
-                  <span className="ml-2 font-medium text-red-700">
+                  <span className="ml-2 font-medium text-brand">
                     ({rows.length} subject{rows.length === 1 ? "" : "s"})
                   </span>
                 </p>
@@ -323,13 +323,13 @@ export default function StudentGradesPage() {
               id="student-panel-cumulative"
               aria-labelledby="student-tab-cumulative"
               tabIndex={0}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
-              <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <div className="p-4 border-b border-gray-200 bg-canvas">
                 <h3 className="text-lg font-semibold text-gray-900">Cumulative Grades</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {subjectName}
-                  <span className="ml-2 font-medium text-red-700">
+                  <span className="ml-2 font-medium text-brand">
                     ({rows.length} subject{rows.length === 1 ? "" : "s"})
                   </span>
                 </p>

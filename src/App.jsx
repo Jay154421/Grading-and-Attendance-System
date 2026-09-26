@@ -17,14 +17,14 @@ import Toaster from "./components/ui/Toast";
 
 function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas px-4 text-center">
       <h1 className="text-2xl font-bold text-gray-900">Page not found</h1>
       <p className="max-w-sm text-sm text-gray-600">
         The address you opened does not match any screen in this app.
       </p>
       <Link
         to="/"
-        className="inline-flex min-h-11 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+        className="inline-flex min-h-11 items-center justify-center rounded-md bg-brand px-4 text-sm font-medium text-white transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand"
       >
         Go to login
       </Link>

@@ -177,7 +177,7 @@ export default function StudentProfilePage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <section className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="p-4 border-b border-gray-200 bg-canvas">
             <h3 className="text-lg font-semibold text-gray-900">Profile Information</h3>
           </div>
           <div className="p-4">
@@ -185,7 +185,7 @@ export default function StudentProfilePage() {
               {details.map((detail) => (
                 <div key={detail.term}>
                   <dt className="text-sm font-medium text-gray-700">{detail.term}</dt>
-                  <dd className="mt-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900">
+                  <dd className="mt-1 rounded-md border border-gray-300 bg-canvas px-3 py-2.5 text-sm text-gray-900">
                     {detail.value || "-"}
                   </dd>
                 </div>
@@ -195,7 +195,7 @@ export default function StudentProfilePage() {
         </section>
 
         <section className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="p-4 border-b border-gray-200 bg-canvas">
             <h3 className="text-lg font-semibold text-gray-900">Profile Photo</h3>
           </div>
           <div className="p-4 space-y-4">
@@ -225,7 +225,7 @@ export default function StudentProfilePage() {
                 />
                 <label
                   htmlFor="photo"
-                  className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-gray-500 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-within:ring-2 focus-within:ring-red-500"
+                  className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-gray-500 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-canvas focus-within:ring-2 focus-within:ring-brand"
                 >
                   <Upload className="h-4 w-4 text-gray-600" aria-hidden="true" />
                   {photoFile ? "Change photo" : "Upload photo"}

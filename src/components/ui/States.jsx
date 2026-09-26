@@ -4,7 +4,7 @@ export function LoadingState({ label = "Loading data" }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-10" role="status">
       <div
-        className="h-7 w-7 animate-spin rounded-full border-2 border-gray-200 border-t-red-600"
+        className="h-7 w-7 animate-spin rounded-full border-2 border-gray-200 border-t-brand"
         aria-hidden="true"
       />
       <p className="text-sm text-gray-600">{label}</p>
@@ -34,7 +34,7 @@ export function ErrorState({ title = "Could not load this data", message, onRetr
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md border border-gray-500 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500"
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md border border-gray-500 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand"
         >
           {retryLabel}
         </button>

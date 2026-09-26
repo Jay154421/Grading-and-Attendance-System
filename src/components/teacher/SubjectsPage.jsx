@@ -251,7 +251,7 @@ export default function SubjectsPage() {
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="px-6 py-4 border-b border-gray-200 bg-canvas">
             <h3 className="text-lg font-medium text-gray-900">Subject List</h3>
           </div>
           <div className="p-6">
@@ -274,7 +274,7 @@ export default function SubjectsPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-canvas">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                         Code
@@ -295,7 +295,7 @@ export default function SubjectsPage() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {subjects.map((subject) => (
-                      <tr key={subject.id} className="hover:bg-gray-50">
+                      <tr key={subject.id} className="hover:bg-canvas">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {subject.code}
                         </td>
@@ -315,7 +315,7 @@ export default function SubjectsPage() {
                               onClick={() => openEditDialog(subject)}
                               aria-label={`Edit ${subject.name}`}
                               title={`Edit ${subject.name}`}
-                              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                             >
                               <Pencil className="h-4 w-4" aria-hidden="true" />
                             </button>

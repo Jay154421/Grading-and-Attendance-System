@@ -76,7 +76,7 @@ export default function Modal({ open, onClose, title, description, children, foo
         aria-labelledby={titleId}
         className={`relative flex max-h-[85vh] w-full ${width} flex-col overflow-hidden rounded-xl bg-white shadow-2xl`}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-gray-200 bg-gray-50 px-6 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-gray-200 bg-canvas px-6 py-4">
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-semibold text-gray-900">
               {title}
@@ -89,14 +89,14 @@ export default function Modal({ open, onClose, title, description, children, foo
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
         <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <footer className="flex flex-wrap justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+          <footer className="flex flex-wrap justify-end gap-3 border-t border-gray-200 bg-canvas px-6 py-4">
             {footer}
           </footer>
         )}

@@ -257,13 +257,13 @@ export default function StudentsPage() {
         {subjects.map((subject) => (
           <label
             key={subject.id}
-            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-gray-50"
+            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-canvas"
           >
             <input
               type="checkbox"
               checked={formData.subjects.includes(subject.id)}
               onChange={() => handleSubjectChange(subject.id)}
-              className="h-4 w-4 rounded border-gray-500 text-red-600 focus:ring-red-500"
+              className="h-4 w-4 rounded border-gray-500 text-brand focus:ring-brand"
             />
             <span className="text-sm text-gray-700">
               {subject.name} <span className="text-gray-600">({subject.code})</span>
@@ -304,7 +304,7 @@ export default function StudentsPage() {
           />
           <label
             htmlFor="photo"
-            className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-gray-500 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-within:ring-2 focus-within:ring-red-500"
+            className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-gray-500 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-canvas focus-within:ring-2 focus-within:ring-brand"
           >
             <Upload className="h-4 w-4 text-gray-600" aria-hidden="true" />
             <span>{photoPreview ? "Change Photo" : "Upload Photo"}</span>
@@ -366,7 +366,7 @@ export default function StudentsPage() {
                 </thead>
                 <tbody>
                   {students.map((student) => (
-                    <tr key={student.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={student.id} className="border-b border-gray-100 hover:bg-canvas">
                       <td className="p-3">
                         <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
                           {student.photo ? (
@@ -398,7 +398,7 @@ export default function StudentsPage() {
                         <div className="flex justify-end">
                           <button
                             type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                             aria-label={`Edit ${student.full_name}`}
                             onClick={() => openEditDialog(student)}
                           >

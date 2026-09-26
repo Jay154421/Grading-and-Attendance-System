@@ -92,9 +92,18 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-canvas py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+          <div className="flex justify-center border-b border-gray-200 px-8 pt-8 pb-6">
+            <img
+              src="/logo-lockup.png"
+              alt="EduCheck Attendance &amp; Grading System"
+              width={326}
+              height={256}
+              className="h-28 object-contain"
+            />
+          </div>
           <div className="flex" role="tablist" aria-label="Account access">
             {tabs.map((tab) => (
               <button
@@ -106,9 +115,9 @@ export default function LoginForm() {
                 aria-controls={`panel-${tab.id}`}
                 tabIndex={activeTab === tab.id ? 0 : -1}
                 onKeyDown={handleTabKeyDown}
-                className={`flex-1 min-h-11 px-2 text-center text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500 ${
+                className={`flex-1 min-h-11 px-2 text-center text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand ${
                   activeTab === tab.id
-                    ? "border-red-600 text-red-700"
+                    ? "border-brand text-brand"
                     : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
                 }`}
                 onClick={() => setActiveTab(tab.id)}

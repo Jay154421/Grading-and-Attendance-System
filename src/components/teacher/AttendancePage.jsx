@@ -185,7 +185,7 @@ export default function AttendancePage() {
             <p className="text-sm text-gray-600 mt-1">
               {format(parseISO(selectedDate), "MMMM d, yyyy")} -{" "}
               {subjects.find((s) => s.id === selectedSubject)?.name}
-              <span className="ml-2 font-medium text-red-700">
+              <span className="ml-2 font-medium text-brand">
                 ({studentsInSubject.length} students)
               </span>
             </p>
@@ -201,7 +201,7 @@ export default function AttendancePage() {
               <>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-canvas">
                       <tr>
                         <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                           Student
@@ -218,7 +218,7 @@ export default function AttendancePage() {
                       {studentsInSubject.map((student) => {
                         const status = currentAttendance[student.id] || ""
                         return (
-                          <tr key={student.id} className="hover:bg-gray-50">
+                          <tr key={student.id} className="hover:bg-canvas">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
                                 <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center">
@@ -247,7 +247,7 @@ export default function AttendancePage() {
                               </label>
                               <select
                                 id={`status-${student.id}`}
-                                className="min-h-11 w-full max-w-[12rem] rounded-md border border-gray-500 bg-white px-3 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                className="min-h-11 w-full max-w-[12rem] rounded-md border border-gray-500 bg-white px-3 text-sm text-gray-900 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
                                 value={status}
                                 onChange={(e) => handleAttendanceChange(student.id, e.target.value)}
                               >

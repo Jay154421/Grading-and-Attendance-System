@@ -6,10 +6,10 @@ const COLLAPSED_KEY = "sidebar-collapsed";
 
 function itemClass(isActive, collapsed) {
   const base =
-    "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2";
+    "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2";
   const layout = collapsed ? "justify-center px-2" : "";
   const color = isActive
-    ? "bg-red-50 text-red-700"
+    ? "bg-brand/10 text-brand"
     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900";
   return `${base} ${layout} ${color}`;
 }
@@ -31,12 +31,16 @@ function NavItem({ item, collapsed, onNavigate }) {
 
 function Brand({ portal, username, collapsed }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-4">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-sm font-bold text-white">
-        {portal.charAt(0)}
-      </span>
+    <div className={collapsed ? "flex justify-center px-2 py-4" : "px-4 py-4"}>
+      <img
+        src={collapsed ? "/logo-mark.png" : "/logo-wordmark.png"}
+        alt="EduCheck"
+        width={collapsed ? 132 : 378}
+        height={collapsed ? 94 : 96}
+        className={collapsed ? "w-11 object-contain" : "h-8 object-contain"}
+      />
       {!collapsed && (
-        <div className="min-w-0">
+        <div className="mt-3 min-w-0">
           <p className="truncate text-sm font-semibold text-gray-900">
             {portal} Portal
           </p>
@@ -54,7 +58,7 @@ function LogoutButton({ onLogout, collapsed, className = "" }) {
     <button
       onClick={onLogout}
       title={collapsed ? "Logout" : undefined}
-      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 ${
+      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
         collapsed ? "justify-center px-2" : ""
       } ${className}`}
       type="button"
@@ -165,7 +169,7 @@ export default function Sidebar({
           <LogoutButton onLogout={onLogout} collapsed={collapsed} />
           <button
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 md:flex md:justify-center"
+            className="hidden min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 md:flex md:justify-center"
             type="button"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -205,7 +209,7 @@ export default function Sidebar({
                 onClick={onCloseMobile}
                 aria-label="Close menu"
                 type="button"
-                className="mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                className="mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <FiX className="h-5 w-5" aria-hidden="true" />
               </button>

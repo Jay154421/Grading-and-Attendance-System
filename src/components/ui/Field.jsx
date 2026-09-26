@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 export const inputClass =
-  "block min-h-11 w-full rounded-md border border-gray-500 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-500 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500";
+  "block min-h-11 w-full rounded-md border border-gray-500 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand aria-invalid:border-red-700 aria-invalid:ring-red-700";
 
 function describedBy(id, hint, error) {
   return [hint ? `${id}-hint` : null, error ? `${id}-error` : null]

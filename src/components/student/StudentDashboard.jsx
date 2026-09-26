@@ -142,7 +142,7 @@ export default function StudentDashboard() {
                 <li key={link.to}>
                   <Link
                     to={link.to}
-                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                   >
                     <link.icon className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
                     <span className="flex-1">{link.label}</span>

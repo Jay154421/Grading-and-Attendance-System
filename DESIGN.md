@@ -7,22 +7,39 @@ The owner is the author of the direction; this file only records it.
 ## Identity
 
 - Internal school tool (teacher and student portals), not a marketing site.
-- Existing brand cue: red. The red stays, used as the accent, not the surface.
+- The interface uses a restrained indigo palette. Red remains a semantic signal for danger and failure states, not a general brand color.
 - Personality: calm, workmanlike, scannable. Nothing playful, nothing trendy.
 
 ## Palette
 
 | Token | Value | Role |
 |---|---|---|
-| Surface | white / gray-50 page background | default everywhere |
-| Text | gray-900 headings, gray-600 secondary | hierarchy by weight, not color |
-| Accent | red-600 (brand mark, primary action, focus cues) | one accent, used sparingly |
-| Active state | red-50 background + red-700 text | marks the current route only |
+| Surface | `#F8FAFC` page background / white cards | 60% of the interface |
+| Primary | `#4338CA` | 30%: primary actions, focus cues |
+| Highlight | `#4338CA` at reduced opacity | 10%: active route/tab indicators and small highlights |
+| Active state | primary at 10% opacity + primary text | marks the current route or tab |
 | Neutral chrome | gray-700 (menu, collapse, close controls) | utility controls must not read as destructive |
 
-Rule: neutrals + one accent (red). No gradients, no glow, no second accent.
-Red is reserved for the brand mark, the primary action, and destructive
-confirmations, so a red control always means something.
+Rule: use `#F8FAFC` for roughly 60% of the surface, `#4338CA` for roughly
+30% of primary UI, and reduced-opacity `#4338CA` for roughly 10% of active UI.
+Neutrals handle text, borders, and elevation. No gradients, no glow, no second
+UI accent hue: the green `#17A668` in the logo is brand artwork only and never
+colors an interface state. Red is reserved for errors, destructive actions,
+failed grades, absent attendance, and required or invalid field indicators.
+
+## Brand assets
+
+- Approved artwork: `public/logo.png` (EduCheck, blue `#3B3CB2` on green
+  `#17A668`). It is the only brand artwork. Nothing is redrawn, recolored, or
+  substituted for it.
+- Variants are crops of that file, nothing more:
+  - `public/logo-lockup.png`: full stacked lockup, auth screen.
+  - `public/logo-wordmark.png`: word and tagline, expanded sidebar.
+  - `public/logo-mark.png`: cap symbol, collapsed 80px rail.
+  - `public/favicon.png`: cap symbol on an opaque white square, because a
+    transparent mark loses contrast against dark browser tab themes.
+- Reason for two sidebar lockups: the 80px rail fits the symbol only, the
+  256px sidebar fits the wordmark. Both are the same approved drawing.
 
 ## Typography
 
@@ -33,10 +50,10 @@ confirmations, so a red control always means something.
 
 ## Sidebar (current spec)
 
-- Light surface (white) instead of the old dark red: the old sidebar was a full
-  red slab that competed with content; red now marks state, not surface.
-- Active route = red-50/red-700 + `aria-current`: the one thing the sidebar
-  must tell you is where you are.
+- Light surface (white) instead of a full-color slab: the sidebar stays quiet so
+  content and status remain easy to scan.
+- Active route = primary at 10% opacity, primary text, and `aria-current`: the
+  one thing the sidebar must tell you is where you are.
 - Collapsible to a 80px icon rail (desktop, persisted): more room for tables
   and grade sheets when reading data.
 - Slide-in drawer on mobile with backdrop: replaces the old duplicated inline
@@ -62,10 +79,14 @@ Every component exists to fix a defect found in audit-002, not to look modern.
 
 - Headings: `h1` belongs to the layout header, `h2` is the page title, `h3` is
   a section. One `h1` per view, no skipped levels.
-- Inputs: `border-gray-500` at rest, `focus:ring-2 ring-red-500` on focus, so
-  the focus ring has a width and is actually visible.
-- Red is for destructive confirmations; status meaning is carried by green/red/
-  yellow/blue-100 chips with -800 text (contrast 6.4-7.2:1), never by red alone.
+- Inputs: `border-gray-500` at rest, `focus:ring-2 ring-brand` on focus, and
+  `aria-invalid` red styling when validation fails.
+- Indigo is the general action, focus, and active-state color. Reduced-opacity
+  indigo is reserved for active route/tab indicators and small highlights.
+- Red is reserved for errors, destructive actions, failed grades, absent
+  attendance, and required or invalid field indicators. Status meaning is
+  carried by green/red/yellow/blue-100 chips with -800 text (contrast
+  6.4-7.2:1), never by red alone.
 - Date selection uses a native `<input type="date">`: the browser keyboard,
   locale, and mobile pickers are correct and free.
 

@@ -264,7 +264,7 @@ export default function GradesPage() {
   ]
 
   const gradeCellClass =
-    "min-h-11 w-24 rounded-md border border-gray-500 bg-white px-2 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 aria-invalid:border-red-700"
+    "min-h-11 w-24 rounded-md border border-gray-500 bg-white px-2 text-sm text-gray-900 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand aria-invalid:border-red-700 aria-invalid:ring-red-700"
 
   return (
     <TeacherLayout title="Grades">
@@ -315,7 +315,7 @@ export default function GradesPage() {
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   className={`min-h-11 px-4 ${
                     activeTab === tab.id
-                      ? "border-b-2 border-red-600 font-medium text-gray-900"
+                      ? "border-b-2 border-brand font-medium text-gray-900"
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                   onClick={() => setActiveTab(tab.id)}
@@ -333,13 +333,13 @@ export default function GradesPage() {
               id="panel-raw"
               aria-labelledby="tab-raw"
               tabIndex={0}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               <div className="p-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold">Raw Grades</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {subjects.find((s) => s.id === selectedSubject)?.name}
-                  <span className="ml-2 font-medium text-red-700">
+                  <span className="ml-2 font-medium text-brand">
                     ({studentsInSubject.length} students)
                   </span>
                 </p>
@@ -374,7 +374,7 @@ export default function GradesPage() {
                         </thead>
                         <tbody>
                           {studentsInSubject.map((student) => (
-                            <tr key={student.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <tr key={student.id} className="border-b border-gray-100 hover:bg-canvas">
                               <td className="p-2">
                                 <div className="flex items-center gap-2">
                                   <div className="h-8 w-8 shrink-0 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
@@ -456,13 +456,13 @@ export default function GradesPage() {
               id="panel-cumulative"
               aria-labelledby="tab-cumulative"
               tabIndex={0}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="bg-white rounded-lg border border-gray-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               <div className="p-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold">Cumulative Grades</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {subjects.find((s) => s.id === selectedSubject)?.name}
-                  <span className="ml-2 font-medium text-red-700">
+                  <span className="ml-2 font-medium text-brand">
                     ({studentsInSubject.length} students)
                   </span>
                 </p>
@@ -500,7 +500,7 @@ export default function GradesPage() {
                           const isPassing = hasFinal && isPassingGrade(g.final)
 
                           return (
-                            <tr key={student.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <tr key={student.id} className="border-b border-gray-100 hover:bg-canvas">
                               <td className="p-2">
                                 <div className="flex items-center gap-2">
                                   <div className="h-8 w-8 shrink-0 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
